@@ -1,0 +1,83 @@
+"""Analysis layer: fidelity, entropy, entanglement and the metrics engine."""
+
+from __future__ import annotations
+
+from qscope.analysis.entanglement import (
+    ENTANGLED,
+    ENTANGLED_WITNESSED,
+    NO_DETECTION,
+    SEPARABLE,
+    concurrence,
+    entanglement_change,
+    entanglement_graph,
+    entanglement_of_formation,
+    entanglement_report,
+    negativity,
+    pairwise_concurrence,
+    partial_transpose,
+)
+from qscope.analysis.entropy import (
+    entropy_spectrum,
+    linear_entropy,
+    normalized_entropy,
+    participation_ratio,
+    purity,
+    renyi,
+    shannon,
+    von_neumann,
+)
+from qscope.analysis.fidelity import (
+    average_gate_fidelity,
+    counts_fidelity_to_target,
+    distinguishability,
+    maximum_likelihood_success,
+    process_fidelity,
+    state_fidelity,
+    total_variation,
+    trace_distance,
+)
+from qscope.analysis.metrics import (
+    METRIC_DEFINITIONS,
+    circuit_metrics,
+    compare_metrics,
+    metric_glossary,
+    state_metrics,
+    summarize_result,
+)
+
+__all__ = [
+    "ENTANGLED",
+    "ENTANGLED_WITNESSED",
+    "METRIC_DEFINITIONS",
+    "NO_DETECTION",
+    "SEPARABLE",
+    "average_gate_fidelity",
+    "circuit_metrics",
+    "compare_metrics",
+    "concurrence",
+    "counts_fidelity_to_target",
+    "distinguishability",
+    "entanglement_change",
+    "entanglement_graph",
+    "entanglement_of_formation",
+    "entanglement_report",
+    "entropy_spectrum",
+    "linear_entropy",
+    "maximum_likelihood_success",
+    "metric_glossary",
+    "negativity",
+    "normalized_entropy",
+    "pairwise_concurrence",
+    "partial_transpose",
+    "participation_ratio",
+    "process_fidelity",
+    "purity",
+    "renyi",
+    "shannon",
+    "state_fidelity",
+    "state_metrics",
+    "summarize_result",
+    "total_variation",
+    "trace_distance",
+    "von_neumann",
+]
