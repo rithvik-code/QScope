@@ -240,7 +240,54 @@ def trace_circuit(
                      :data:`ENTANGLEMENT_PAIR_LIMIT` qubits.
 
     Measurement operations collapse the traced state exactly as they would in a
-    real run (a fixed seed makes the trace reproducible).
+    real run (a fixed seed makes the trace reproducible).  The work is done by
+    :func:`iter_trace`; this function simply collects it.
+    """
+    run: dict[str, Any] = {}
+    steps = list(
+        iter_trace(
+            circuit,
+            depth=depth,
+            term_limit=term_limit,
+            max_steps=max_steps,
+            analyze_last_only=analyze_last_only,
+            run=run,
+        )
+    )
+    return TraceResult(
+        circuit_name=circuit.name,
+        num_qubits=circuit.num_qubits,
+        depth_mode=depth,
+        steps=steps,
+        initial_state=run["initial_state"],
+        final_state=run["final_state"],
+        total_seconds=run["seconds"],
+        n_operations=len(circuit.operations),
+        layers=run["layers"],
+        warnings=run["warnings"],
+        notes=run["notes"],
+    )
+
+
+def iter_trace(
+    circuit: Circuit,
+    *,
+    depth: str = TRACE_STANDARD,
+    term_limit: int = 32,
+    max_steps: int | None = None,
+    analyze_last_only: bool = False,
+    run: dict[str, Any] | None = None,
+) -> Iterator[TraceStep]:
+    """Yield one :class:`TraceStep` per operation, as the state evolves.
+
+    This is the streaming form of :func:`trace_circuit` — the same work, handed to
+    the caller step by step, which is what the live debugger needs.  When it is
+    exhausted, ``run`` (if supplied) holds ``initial_state``, ``final_state``,
+    ``layers``, ``severity``-free ``warnings``/``notes`` and ``seconds``.
+
+    ``analyze_last_only`` computes the cheap metrics for every step but the full
+    requested ``depth`` analysis only on the final step: the right trade-off for a
+    live stream, where intermediate steps are watched rather than reported.
     """
     if depth not in (TRACE_FAST, TRACE_STANDARD, TRACE_FULL):
         raise ValueError(f"unknown trace depth {depth!r}")
@@ -269,10 +316,10 @@ def trace_circuit(
         for op_index in layer:
             layer_of[op_index] = layer_index
 
-    steps: list[TraceStep] = []
     cumulative = 0.0
     started_all = time.perf_counter()
     previous = state.copy()
+    last_index = len(ops) - 1
 
     for index, op in enumerate(ops):
         before = previous
@@ -300,49 +347,44 @@ def trace_circuit(
             before_snapshot = state.copy()
 
         diff = diff_states(before_snapshot, state)
-        steps.append(
-            TraceStep(
-                index=index,
-                operation=op.to_dict(),
-                kind=op.kind,
-                name=op.name,
-                display=op.display,
-                targets=list(op.targets),
-                controls=list(op.controls),
-                params=list(op.params),
-                layer=layer_of.get(index, 0),
-                seconds=elapsed,
-                cumulative_seconds=cumulative,
-                state=_state_dict(state, term_limit, True),
-                state_before=_state_dict(before_snapshot, term_limit, True),
-                diff=diff,
-                metrics=_step_metrics(state, depth),
-                probabilities={
-                    basis_label(circuit.num_qubits, i): float(p)
-                    for i, p in enumerate(state.probabilities())
-                    if p > 1e-12
-                },
-                measurement=measurement,
-            )
+        step_depth = depth if (not analyze_last_only or index == last_index) else TRACE_FAST
+        yield TraceStep(
+            index=index,
+            operation=op.to_dict(),
+            kind=op.kind,
+            name=op.name,
+            display=op.display,
+            targets=list(op.targets),
+            controls=list(op.controls),
+            params=list(op.params),
+            layer=layer_of.get(index, 0),
+            seconds=elapsed,
+            cumulative_seconds=cumulative,
+            state=_state_dict(state, term_limit, True),
+            state_before=_state_dict(before_snapshot, term_limit, True),
+            diff=diff,
+            metrics=_step_metrics(state, step_depth),
+            probabilities={
+                basis_label(circuit.num_qubits, i): float(p)
+                for i, p in enumerate(state.probabilities())
+                if p > 1e-12
+            },
+            measurement=measurement,
         )
         previous = state.copy()
 
     total = time.perf_counter() - started_all
     final_state = _state_dict(state, term_limit, True)
     final_state["entanglement_status"] = _entanglement_status(state)
-    return TraceResult(
-        circuit_name=circuit.name,
-        num_qubits=circuit.num_qubits,
-        depth_mode=depth,
-        steps=steps,
-        initial_state=initial,
-        final_state=final_state,
-        total_seconds=total,
-        n_operations=len(circuit.operations),
-        layers=layers,
-        warnings=warnings,
-        notes=notes,
-    )
+    if run is not None:
+        run.update(
+            initial_state=initial,
+            final_state=final_state,
+            layers=layers,
+            warnings=warnings,
+            notes=notes,
+            seconds=total,
+        )
 
 
 def replay_states(
@@ -369,6 +411,7 @@ __all__ = [
     "TraceResult",
     "TraceStep",
     "Operation",
+    "iter_trace",
     "replay_states",
     "states_at",
     "trace_circuit",
