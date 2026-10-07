@@ -28,6 +28,7 @@ from qscope.circuit.circuit import Circuit, Operation
 from qscope.core.tensor import unitary_distance
 from qscope.optimizer.rules import (
     RuleMatch,
+    aligned_segments,
     compact_qubits,
     find_cancellation,
     find_clifford_pair,
@@ -54,7 +55,13 @@ DEFAULT_PROOF_QUBITS = 9
 
 @dataclass
 class OptimizationStep:
-    """One applied rewrite."""
+    """One applied rewrite.
+
+    ``verified`` and ``deviation`` record the outcome of the per-rewrite check: the
+    segment before and after the rewrite was rebuilt as a unitary and compared, so
+    a rule that is subtly wrong is caught at the step that caused it rather than
+    only at the end.
+    """
 
     rule: str
     description: str
@@ -66,6 +73,9 @@ class OptimizationStep:
     gates_after: int
     depth_before: int
     depth_after: int
+    verified: bool | None = None
+    deviation: float | None = None
+    rolled_back: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -79,6 +89,9 @@ class OptimizationStep:
             "gates_after": self.gates_after,
             "depth_before": self.depth_before,
             "depth_after": self.depth_after,
+            "verified": self.verified,
+            "deviation": self.deviation,
+            "rolled_back": self.rolled_back,
         }
 
 
@@ -106,11 +119,12 @@ class OptimizationResult:
             "improvements": self.improvements,
             "steps": [s.to_dict() for s in self.steps],
             "verification": self.verification,
-            "passes_applied": self.passes_applied,
-            "findings": self.findings,
-            "qubit_map": self.qubit_map,
-            "seconds": self.seconds,
-            "notes": self.notes,
+        "passes_applied": self.passes_applied,
+        "findings": self.findings,
+        "qubit_map": self.qubit_map,
+        "seconds": self.seconds,
+        "notes": self.notes,
+        "phase_policy": "exact operator equivalence; global phase is never exploited",
             "gate_histogram_before": self.before.get("histogram", {}),
             "gate_histogram_after": self.after.get("histogram", {}),
         }
@@ -195,29 +209,49 @@ def optimise(
     compact: bool | None = None,
     proof_qubits: int = DEFAULT_PROOF_QUBITS,
     passes: Sequence[str] | None = None,
+    verify_each_step: bool | None = None,
 ) -> OptimizationResult:
     """Optimise a circuit and verify the result.
 
     ``level`` selects the rule set (``safe`` < ``standard`` < ``aggressive``);
     ``compact`` removes unused qubits (default: only at level ``aggressive``).
+
+    ``verify_each_step`` (default: on for small circuits) rebuilds the affected
+    segment's unitary after every rewrite and rolls the rewrite back if it changed
+    the operator.  A rule that fails is disabled for the rest of the run and the
+    failure is reported — the optimiser is never allowed to ship a wrong circuit.
     """
     if level not in LEVEL_PASSES:
         raise ValueError(f"unknown optimisation level {level!r}")
     if compact is None:
         compact = level == PASS_AGGRESSIVE
+    if verify_each_step is None:
+        verify_each_step = circuit.num_qubits <= proof_qubits
     enabled = list(passes) if passes else LEVEL_PASSES[level]
     started = time.perf_counter()
 
     original = circuit.copy(name=circuit.name)
     working = circuit.copy(name=circuit.name)
+    original_segments = aligned_segments(original)
     steps: list[OptimizationStep] = []
     notes: list[str] = []
     passes_applied: list[str] = []
+    disabled: dict[str, str] = {}
+
+    def segment_ordinal(index: int) -> int:
+        """Ordinal of the segment containing an operation index (divider aligned)."""
+        ordinal = 0
+        for position, op in enumerate(working.operations):
+            if position == index:
+                return ordinal
+            if op.kind in ("measure", "reset", "barrier"):
+                ordinal += 1
+        return ordinal
 
     for sweep in range(max_sweeps):
         changed = False
         for rule_name, finder in PASS_ORDER:
-            if rule_name not in enabled:
+            if rule_name not in enabled or rule_name in disabled:
                 continue
             while True:
                 bounds = segment_bounds(working.operations)
@@ -236,7 +270,31 @@ def optimise(
                         break
                 if match is None:
                     break
-                steps.append(_apply_match(working, match))
+
+                before_snapshot = working.copy()
+                ordinal = segment_ordinal(min(match.indices)) if verify_each_step else -1
+                step = _apply_match(working, match)
+
+                if verify_each_step and ordinal < len(original_segments):
+                    ok, deviation = _segment_equivalent(
+                        original_segments[ordinal],
+                        aligned_segments(working)[ordinal],
+                        working.num_qubits,
+                    )
+                    step.verified = ok
+                    step.deviation = deviation
+                    if not ok:
+                        step.rolled_back = True
+                        working = before_snapshot
+                        disabled[rule_name] = (
+                            f"rule {rule_name} produced a non-equivalent segment "
+                            f"(max deviation {deviation:.3e}); it was rolled back and disabled"
+                        )
+                        notes.append(disabled[rule_name])
+                        steps.append(step)
+                        continue
+
+                steps.append(step)
                 if rule_name not in passes_applied:
                     passes_applied.append(rule_name)
                 changed = True
@@ -259,7 +317,7 @@ def optimise(
 
     findings = find_opportunities(original)
     verification = (
-        verify_equivalence(original, working, proof_qubits=proof_qubits)
+        verify_equivalence(original, working, proof_qubits=proof_qubits, qubit_map=qubit_map)
         if verify
         else {
             "status": VERIFIED_SKIPPED,
@@ -267,6 +325,8 @@ def optimise(
             "limitations": ["This optimisation was NOT verified."],
         }
     )
+    if disabled:
+        verification["disabled_rules"] = disabled
 
     if verify and verification["status"] == VERIFIED_FAILED:
         notes.append(
@@ -328,12 +388,17 @@ def verify_equivalence(
     proof_qubits: int = DEFAULT_PROOF_QUBITS,
     random_states: int = 6,
     tolerance: float = 1e-9,
+    qubit_map: dict[int, int] | None = None,
 ) -> dict[str, Any]:
     """Check that two circuits implement the same computation.
 
     Returns a verdict with the method used and its limitations.  ``PROVEN`` means
     every unitary segment matches exactly (up to a global phase per segment), which
     is a complete proof for the gate-model circuits QScope handles.
+
+    ``qubit_map`` remaps the original circuit's wires onto the candidate's so that
+    an optimization which removed unused qubits can still be *proven*, not merely
+    assumed, to be equivalent.
     """
     limitations: list[str] = []
     if original.num_clbits != candidate.num_clbits:
@@ -348,19 +413,27 @@ def verify_equivalence(
             "Classically-conditioned gates are compared segment by segment; feedback behaviour is "
             "checked by structure, not by unitary equivalence."
         )
-    if candidate.num_qubits != original.num_qubits:
-        return {
-            "status": VERIFIED_STATISTICAL,
-            "method": "resource comparison only",
-            "reason": (
-                "Qubit counts differ because unused wires were removed; the qubit map records the "
-                "relabelling. Unitary equivalence is verified on the compacted wire set."
-            ),
-            "limitations": ["Comparability relies on the reported qubit map."],
-        }
 
-    seg_a = _segment_gates(original)
-    seg_b = _segment_gates(candidate)
+    reference = original
+    if candidate.num_qubits != original.num_qubits:
+        if qubit_map is None:
+            return {
+                "status": VERIFIED_STATISTICAL,
+                "method": "resource comparison only",
+                "reason": (
+                    "Qubit counts differ and no qubit map was supplied; equivalence could not be "
+                    "checked on the same wire set."
+                ),
+                "limitations": ["Comparability relies on the reported qubit map."],
+            }
+        reference = _remap_circuit(original, qubit_map)
+        limitations.append(
+            "Unused wires were removed, so equivalence is proven on the compacted wire set using "
+            "the reported qubit map."
+        )
+
+    seg_a = [[op for op in segment if op.kind == "gate"] for segment in aligned_segments(reference)]
+    seg_b = [[op for op in segment if op.kind == "gate"] for segment in aligned_segments(candidate)]
     if len(seg_a) != len(seg_b):
         return {
             "status": VERIFIED_FAILED,
@@ -369,7 +442,7 @@ def verify_equivalence(
             "limitations": [],
         }
 
-    n = original.num_qubits
+    n = candidate.num_qubits
     if n <= proof_qubits:
         worst = 0.0
         per_segment: list[dict[str, Any]] = []
@@ -380,7 +453,14 @@ def verify_equivalence(
             ub = _unitary_of(gates_b, n)
             distance = unitary_distance(ua, ub)
             worst = max(worst, distance)
-            per_segment.append({"segment": index, "gates_before": len(gates_a), "gates_after": len(gates_b), "distance": distance})
+            per_segment.append(
+                {
+                    "segment": index,
+                    "gates_before": len(gates_a),
+                    "gates_after": len(gates_b),
+                    "distance": distance,
+                }
+            )
         ok = worst <= tolerance * 10
         return {
             "status": VERIFIED_PROVEN if ok else VERIFIED_FAILED,
@@ -397,19 +477,16 @@ def verify_equivalence(
         }
 
     # Large circuits: compare outputs on random prepared inputs.
-    from qscope.simulator.simulator import simulate_shot
     from qscope.simulator.noise import NoiseModel
+    from qscope.simulator.simulator import simulate_shot
 
     rng = np.random.default_rng(1234)
     fidelities: list[float] = []
     for _ in range(random_states):
-        prep = _random_prep(n, rng)
-        base_a = prep.copy()
-        base_b = prep.copy()
-        for gate_set in seg_a[:1]:
-            base_a.extend(gate_set)
-        for gate_set in seg_b[:1]:
-            base_b.extend(gate_set)
+        base_a = _random_prep(n, rng)
+        base_a.extend(seg_a[0])
+        base_b = _random_prep(n, rng)
+        base_b.extend(seg_b[0])
         state_a, _, _ = simulate_shot(
             base_a, "statevector", NoiseModel.ideal(), rng, ops=list(base_a.operations)
         )
@@ -432,12 +509,39 @@ def verify_equivalence(
     }
 
 
-def _segment_gates(circuit: Circuit) -> list[list[Operation]]:
-    """Gate-only slices, one per unitary segment."""
-    return [
-        [op for op in circuit.operations[start:end] if op.kind == "gate"]
-        for start, end in segment_bounds(circuit.operations)
-    ]
+def _segment_equivalent(
+    before: list[Operation],
+    after: list[Operation],
+    n: int,
+    tolerance: float = 1e-8,
+) -> tuple[bool, float]:
+    """Exact per-segment equivalence check used to validate every single rewrite."""
+    if not before and not after:
+        return True, 0.0
+    try:
+        ua = _unitary_of(before, n)
+        ub = _unitary_of(after, n)
+    except Exception as exc:  # pragma: no cover - defensive
+        return False, float("inf")
+    distance = unitary_distance(ua, ub)
+    return distance <= tolerance, distance
+
+
+def _remap_circuit(circuit: Circuit, qubit_map: dict[int, int]) -> Circuit:
+    """Apply a qubit relabelling (used when comparing before/after compaction)."""
+    out = Circuit(
+        len(set(qubit_map.values())),
+        circuit.num_clbits,
+        name=circuit.name,
+        qubit_labels=[circuit.qubits.label(q) for q in sorted(qubit_map, key=lambda k: qubit_map[k])],
+        clbit_labels=circuit.clbits.labels,
+    )
+    for op in circuit.operations:
+        clone = op.copy()
+        clone.targets = [qubit_map[q] for q in clone.targets]
+        clone.controls = [qubit_map[c] for c in clone.controls]
+        out.operations.append(clone)
+    return out
 
 
 def _unitary_of(gates: Sequence[Operation], n: int) -> np.ndarray:

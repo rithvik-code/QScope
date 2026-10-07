@@ -45,24 +45,26 @@ neither is entanglement.  Getting this wrong would silently change a circuit, so
 each entry is justified per gate rather than assumed.
 """
 
-CLIFFORD_PAIRS: dict[frozenset[str], str] = {
+CLIFFORD_PAIRS: dict[tuple[str, str], str] = {
     # S is diag(1, i), T is diag(1, e^{i pi/4}); both are diagonal so the products
-    # below are order independent.  Only *exact* products are listed: e.g. T·Z = -T†
-    # differs from T† by a relative phase, so it is deliberately absent.
-    frozenset({"S", "S"}): "Z",
-    frozenset({"SDG", "SDG"}): "Z",
-    frozenset({"S", "SDG"}): "I",
-    frozenset({"T", "T"}): "S",
-    frozenset({"TDG", "TDG"}): "SDG",
-    frozenset({"T", "TDG"}): "I",
-    frozenset({"S", "Z"}): "SDG",
-    frozenset({"SDG", "Z"}): "S",
-    frozenset({"T", "SDG"}): "TDG",
-    frozenset({"TDG", "S"}): "T",
-    frozenset({"Z", "Z"}): "I",
-    frozenset({"H", "H"}): "I",
-    frozenset({"X", "X"}): "I",
-    frozenset({"Y", "Y"}): "I",
+    # below are order independent (keys are sorted pairs).  Only *exact* products
+    # are listed: T·Z = -T† differs from T† by a relative phase, so it is
+    # deliberately absent.  The test suite re-derives every entry from the gate
+    # matrices, so a wrong row cannot survive as silent circuit corruption.
+    ("S", "S"): "Z",
+    ("SDG", "SDG"): "Z",
+    ("S", "SDG"): "I",
+    ("T", "T"): "S",
+    ("TDG", "TDG"): "SDG",
+    ("T", "TDG"): "I",
+    ("S", "Z"): "SDG",
+    ("SDG", "Z"): "S",
+    ("T", "SDG"): "TDG",
+    ("S", "TDG"): "T",
+    ("Z", "Z"): "I",
+    ("H", "H"): "I",
+    ("X", "X"): "I",
+    ("Y", "Y"): "I",
 }
 """Two-gate products that are exactly one named gate (Clifford relations).
 
@@ -217,7 +219,7 @@ def find_clifford_pair(ops: Sequence[Operation]) -> RuleMatch | None:
                 break
             if not same_wires(a, b):
                 continue
-            key = frozenset({resolve_name(a.name), resolve_name(b.name)})
+            key = tuple(sorted((resolve_name(a.name), resolve_name(b.name))))
             if key not in CLIFFORD_PAIRS:
                 continue
             if not can_shift_past(ops, i, j):
