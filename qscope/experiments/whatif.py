@@ -381,6 +381,11 @@ def what_if(
         f"variant ({label}): {variant['circuit']['gates']} gates, depth {variant['circuit']['depth']}, "
         f"{variant['runtime_seconds']:.6f} s, top outcome |{variant['top_outcome']}⟩",
     ]
+    if deltas["qubits"] and shape_distance == 0.0:
+        observations.append(
+            "the reported distribution covers only the qubits this circuit measures, so a change in the "
+            "qubit count with no measured-wire change leaves the distribution identical"
+        )
     if store is not None:
         try:
             for tag, result, bench in (("baseline", base_result, circuit), ("variant", variant_result, variant_circuit)):

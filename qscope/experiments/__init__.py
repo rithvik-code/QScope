@@ -27,6 +27,14 @@ from qscope.experiments.report import (
     report_from_result,
     report_from_trace,
 )
+from qscope.experiments.whatif import (
+    MODIFICATIONS,
+    WhatIfResult,
+    apply_modification,
+    experiment_what_if,
+    what_if,
+    what_if_catalog,
+)
 from qscope.experiments.runner import (
     EXPERIMENT_KINDS,
     ExperimentOutcome,
@@ -47,6 +55,8 @@ from qscope.experiments.runner import (
 __all__ = [
     "DEFAULT_DB",
     "EXPERIMENT_KINDS",
+    "MODIFICATIONS",
+    "WhatIfResult",
     "ExperimentOutcome",
     "ExperimentRow",
     "ExperimentSpec",
@@ -60,6 +70,7 @@ __all__ = [
     "StoredExperiment",
     "SweepAxis",
     "algorithm_scaling",
+    "apply_modification",
     "backend_comparison",
     "benchmark_backends",
     "benchmark_gate_throughput",
@@ -70,6 +81,7 @@ __all__ = [
     "custom_experiment",
     "detect_external_backends",
     "experiment_catalog",
+    "experiment_what_if",
     "ghz_circuit",
     "memory_observatory",
     "noise_sweep",
@@ -84,4 +96,6 @@ __all__ = [
     "report_from_trace",
     "run_experiment",
     "shots_convergence",
+    "what_if",
+    "what_if_catalog",
 ]
