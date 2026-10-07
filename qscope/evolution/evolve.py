@@ -552,9 +552,16 @@ def genetic_search(
 
     candidates: list[Candidate] = []
     seen: set[str] = set()
-    for _, individual in sorted(((_fitness(ind, target_matrix), ind) for ind in population), key=lambda p: -p[0]):
+    # Only individuals that actually reproduce the target are offered as candidates;
+    # anything below 50 % fidelity is search debris, not an implementation.  It is
+    # still reported in the log so the search is not hiding failures.
+    scored_population = sorted(((_fidelity(ind, target_matrix), ind) for ind in population), key=lambda p: -p[0])
+    for fitness, individual in scored_population:
         key = individual.to_json(indent=None)
         if key in seen:
+            continue
+        exact_enough = fitness >= 0.5
+        if not exact_enough and candidates:
             continue
         seen.add(key)
         candidates.append(
@@ -574,6 +581,14 @@ def genetic_search(
         )
         if len(candidates) >= 5:
             break
+    rejected = sum(1 for fitness, _ in scored_population if fitness < 0.5)
+    if rejected:
+        log_line = (
+            f"genetic search: {rejected} of {len(population)} final individuals did not reproduce "
+            "the target and were discarded as candidates"
+        )
+        if candidates:
+            candidates[0].notes.append(log_line)
     if candidates and candidates[0].fidelity < 0.999:
         candidates[0].notes.append(
             "The best evolved circuit is NOT exactly equivalent to the target; it is an "
