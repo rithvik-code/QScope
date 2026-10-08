@@ -9,6 +9,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { api } from "../lib/api";
 import { AnimatedNumber, InView, MeterBar } from "../components/motion";
 import type { ModeKey } from "../components/Shell";
 import { Button, CodeBlock, Field, Notice, Panel, SectionTitle, Segmented, Select, StatTile, Tag, WarningList } from "../components/ui";
@@ -336,20 +337,15 @@ export function AnalyzeMode({ onNavigate }: { onNavigate: (mode: ModeKey) => voi
                   variant="primary"
                   disabled={loading.compare}
                   onClick={() => {
-                    if (otherCircuit === "same-optimized") {
-                      void (async () => {
-                        const { api } = await import("../lib/api");
+                    void (async () => {
+                      if (otherCircuit === "same-optimized") {
                         const optimization = await api.optimize({ source: { circuit }, level: settings.optimizerLevel });
                         if (optimization.optimized) await compare({ circuit: optimization.optimized });
-                      })();
-                    } else {
-                      void (async () => {
-                        const { api } = await import("../lib/api");
-                        const built = await api.document({ algorithm: otherCircuit });
-                        await compare({ circuit: built });
+                      } else {
+                        await compare({ algorithm: otherCircuit });
                         await loadAlgorithm(otherCircuit);
-                      })();
-                    }
+                      }
+                    })();
                   }}
                 >
                   {loading.compare ? "comparing…" : "compare"}
