@@ -555,7 +555,7 @@ def genetic_search(
     # Only individuals that actually reproduce the target are offered as candidates;
     # anything below 50 % fidelity is search debris, not an implementation.  It is
     # still reported in the log so the search is not hiding failures.
-    scored_population = sorted(((_fidelity(ind, target_matrix), ind) for ind in population), key=lambda p: -p[0])
+    scored_population = sorted(((_fitness(ind, target_matrix), ind) for ind in population), key=lambda p: -p[0])
     for fitness, individual in scored_population:
         key = individual.to_json(indent=None)
         if key in seen:
