@@ -26,7 +26,6 @@ export function AnalyzeMode({ onNavigate }: { onNavigate: (mode: ModeKey) => voi
     compareResult,
     whatIf,
     settings,
-    setSettings,
     loading,
     errors,
     compare,

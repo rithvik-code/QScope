@@ -183,15 +183,21 @@ class ExecutionPlan:
         }
 
 
+MEMORY_BUDGET_ENV = "QSCOPE_MEMORY_MB"
+# The older, longer name is still honoured so an existing environment keeps working.
+MEMORY_BUDGET_ENV_ALIASES = ("QSCOPE_MEMORY_MB", "QSCOPE_MEMORY_BUDGET_MB")
+
+
 def memory_budget_bytes(explicit_mb: float | None = None) -> int:
     """Memory QScope is willing to use for one simulation.
 
-    Order of precedence: explicit value, ``QSCOPE_MEMORY_BUDGET_MB``, then 60 % of
-    the memory currently available to the process.
+    Order of precedence: explicit value, ``QSCOPE_MEMORY_MB`` (alias
+    ``QSCOPE_MEMORY_BUDGET_MB``), then 60 % of the memory currently available to the
+    process.
     """
     if explicit_mb is not None:
         return int(explicit_mb * 1e6)
-    env = os.environ.get("QSCOPE_MEMORY_BUDGET_MB")
+    env = next((os.environ[name] for name in MEMORY_BUDGET_ENV_ALIASES if os.environ.get(name)), None)
     if env:
         try:
             return int(float(env) * 1e6)
@@ -284,7 +290,7 @@ def plan_execution(circuit: Circuit, options: RunOptions) -> ExecutionPlan:
             warnings=warnings + [
                 f"{spec.label} needs about {describe_bytes(peak)} of working memory for {n} "
                 f"qubits, above the {describe_bytes(budget)} budget. Reduce the qubit count, "
-                f"raise QSCOPE_MEMORY_BUDGET_MB, or switch backend (safe maximum: "
+                f"raise {MEMORY_BUDGET_ENV}, or switch backend (safe maximum: "
                 f"{safe_max_qubits(backend, budget)} qubits)."
             ],
         )

@@ -7,7 +7,8 @@
  * numbers in the header are the same ones a run will use.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { FieldGuide } from "../components/Guide";
 import { api } from "../lib/api";
 import { Button, CodeBlock, Field, IconButton, Notice, NumberInput, Panel, SectionTitle, Segmented, Select, Tag } from "../components/ui";
 import { CircuitCanvas } from "../components/viz/quantum";
@@ -72,6 +73,7 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
   const [selected, setSelected] = useState<number | null>(null);
   const [view, setView] = useState<"diagram" | "qasm">("diagram");
   const [qubits, setQubits] = useState(3);
+  const guideRef = useRef<HTMLDivElement | null>(null);
   const [qasmInput, setQasmInput] = useState("");
   const [pendingGate, setPendingGate] = useState<string | null>(null);
 

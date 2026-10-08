@@ -20,8 +20,6 @@ interface CanvasProps {
   compact?: boolean;
 }
 
-const TWO_QUBIT_CONTROLLED = new Set(["CNOT", "CX", "CY", "CZ", "CH", "CP", "CSWAP", "TOFFOLI", "CCX", "CCZ", "MCX"]);
-
 function gateColour(name: string): string {
   if (["H", "X", "Y", "Z", "S", "T", "SDG", "TDG", "SX", "SXDG"].includes(name)) return "var(--c-primary)";
   if (name.startsWith("R") || ["P", "U2", "U3"].includes(name)) return "var(--c-secondary)";
@@ -63,7 +61,7 @@ export function CircuitCanvas({ circuit, activeIndex, onSelect, showClassical = 
     });
     const layerCount = Math.max(...Array.from(layerOf.values()), 0) + 1;
     const layerWidths = new Array(layerCount).fill(compact ? 40 : 52);
-    circuit.operations.forEach((operation, index) => {
+    circuit.operations.forEach((operation) => {
       const wires = [...operation.controls, ...operation.targets];
       const layer = Math.max(...wires.map((wire) => layerOf.get(wire) ?? 0));
       const label = operationLabel(operation);

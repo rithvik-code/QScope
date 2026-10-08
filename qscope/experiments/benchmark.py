@@ -31,6 +31,7 @@ import numpy as np
 from qscope.circuit.circuit import Circuit
 from qscope.simulator.execution import (
     BACKENDS,
+    MEMORY_BUDGET_ENV,
     RunOptions,
     describe_bytes,
     memory_budget_bytes,
@@ -360,7 +361,7 @@ def memory_observatory(
         ],
         "notes": [
             f"Memory budget: {describe_bytes(budget)} "
-            "(override with QSCOPE_MEMORY_BUDGET_MB).",
+            f"(override with {MEMORY_BUDGET_ENV}).",
             "A density matrix needs 4^n complex entries, so it caps out far earlier than a state vector.",
             "QScope refuses a run rather than attempting an allocation it cannot complete.",
         ],

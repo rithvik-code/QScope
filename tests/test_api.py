@@ -693,3 +693,73 @@ def test_reports_dir_is_created_under_the_configured_path(client: TestClient) ->
 
     assert REPORTS_DIR.exists()
     assert Path(os.environ["QSCOPE_REPORTS"]) == REPORTS_DIR
+
+
+# ---------------------------------------------------------------------------
+# the entry point itself
+# ---------------------------------------------------------------------------
+
+
+def test_entry_point_hands_uvicorn_the_asgi_app(monkeypatch) -> None:
+    """``python -m qscope`` must pass the application, not the module that defines it.
+
+    ``qscope.api.app`` is a module *and* the attribute holding the FastAPI instance,
+    and ``from qscope.api import app`` resolves to the module — which uvicorn cannot
+    call.  This test fails loudly if that ever comes back.
+    """
+    import uvicorn
+
+    import qscope.__main__ as entry
+
+    captured: dict[str, object] = {}
+
+    def fake_run(target: object, **kwargs: object) -> None:
+        captured["target"] = target
+        captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(uvicorn, "run", fake_run)
+
+    assert entry.main(["--port", "0"]) == 0
+    assert callable(captured["target"]), "uvicorn was given something that is not callable"
+    assert captured["kwargs"]["port"] == 0  # type: ignore[index]
+    assert captured["kwargs"]["reload"] is False  # type: ignore[index]
+
+    # With --reload uvicorn needs an import string instead of an instance.
+    assert entry.main(["--reload"]) == 0
+    assert captured["target"] == "qscope.api.app:app"
+
+
+def test_main_info_prints_the_environment(capsys) -> None:
+    import qscope.__main__ as entry
+
+    assert entry.main(["--info"]) == 0
+    printed = capsys.readouterr().out
+    assert "QScope" in printed
+    assert "numpy" in printed
+    assert "engines" in printed
+
+
+def test_memory_budget_follows_the_documented_variable(client: TestClient) -> None:
+    """The module fixture sets QSCOPE_MEMORY_MB; every plan must obey it.
+
+    The budget used to be read from a different name, which meant the variable the CLI,
+    the README and these tests set had no effect at all.
+    """
+    payload = expect_ok(
+        client.post(
+            "/api/plan",
+            json={
+                "source": {"algorithm": "ghz_state", "algorithm_kwargs": {"num_qubits": 28}},
+                "backend": "statevector",
+                "shots": 128,
+            },
+        ),
+        "budget_mb",
+        "blocked",
+        "safe_max_qubits",
+        "warnings",
+    )
+    assert payload["budget_mb"] == 256
+    assert payload["blocked"] is True  # 16 bytes × 2^28 amplitudes cannot fit in 256 MB
+    assert payload["safe_max_qubits"] < 28
+    assert any("QSCOPE_MEMORY_MB" in warning for warning in payload["warnings"])

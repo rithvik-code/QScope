@@ -573,6 +573,9 @@ def _run_point(
             metadata={"experiment_key": spec.key, "params": params},
         )
         experiment_id = stored.experiment_id
+        # Keep the id on the row itself, so a stored point can be opened again even if
+        # another point of the sweep was skipped and the outcome-level list is shorter.
+        row.experiment_id = experiment_id
     return row, warnings, experiment_id
 
 

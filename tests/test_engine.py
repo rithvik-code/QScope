@@ -40,10 +40,12 @@ from qscope.experiments import (
 from qscope.hardware import HARDWARE_PRESETS, hardware_report
 from qscope.optimizer import opportunities, optimise
 from qscope.simulator import (
+    MEMORY_BUDGET_ENV,
     MODE_IDEAL,
     MODE_NOISY,
     RunOptions,
     SimulationError,
+    memory_budget_bytes,
     run_circuit,
 )
 from qscope.simulator.noise import NoiseModel
@@ -165,6 +167,22 @@ def test_memory_budget_refusal_is_explicit() -> None:
     payload = error.to_dict()
     assert payload["error"]
     assert payload["plan"]["warnings"]
+    # The refusal has to name the knob that would change the outcome.
+    assert MEMORY_BUDGET_ENV in payload["plan"]["warnings"][-1]
+
+
+def test_memory_budget_env_var_is_the_documented_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``QSCOPE_MEMORY_MB`` is what the CLI, the API and the README advertise."""
+    monkeypatch.delenv("QSCOPE_MEMORY_BUDGET_MB", raising=False)
+    monkeypatch.setenv(MEMORY_BUDGET_ENV, "123")
+    assert memory_budget_bytes() == 123_000_000
+    # The longer name still works, so an existing environment does not silently lose it.
+    monkeypatch.delenv(MEMORY_BUDGET_ENV, raising=False)
+    monkeypatch.setenv("QSCOPE_MEMORY_BUDGET_MB", "456")
+    assert memory_budget_bytes() == 456_000_000
+    monkeypatch.delenv("QSCOPE_MEMORY_BUDGET_MB", raising=False)
+    assert memory_budget_bytes(7) == 7_000_000
+    assert memory_budget_bytes() > 0
 
 
 def test_metrics_are_reported_for_a_noisy_run_against_the_ideal_one() -> None:
@@ -347,6 +365,10 @@ def test_experiment_rows_record_their_own_provenance(store) -> None:
         assert row.mode in {MODE_IDEAL, MODE_NOISY}
         assert row.runtime_seconds >= 0
         assert row.memory_mb > 0
+        # The id has to live on the row, not only in the outcome-level list: a row is
+        # what a reader points at in the interface, and it must be reopenable.
+        assert row.experiment_id is not None
+        assert store.get(row.experiment_id) is not None
     stored = store.get(outcome.experiment_ids[0])
     assert stored is not None
     assert stored.reproducibility()["random_seed"] == spec.seed

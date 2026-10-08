@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from qscope.simulator.execution import (
     BACKENDS,
+    MEMORY_BUDGET_ENV,
     BackendSpec,
     ExecutionPlan,
     RunOptions,

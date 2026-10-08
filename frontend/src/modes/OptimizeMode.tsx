@@ -89,7 +89,7 @@ export function OptimizeMode({ onNavigate }: { onNavigate: (mode: ModeKey) => vo
                 <Select
                   value={settings.optimizerLevel}
                   options={(meta?.optimizer_levels ?? []).map((level) => ({ value: level.key, label: level.label }))}
-                  onChange={(value) => setSettings({ optimizerLevel: value })}
+                  onChange={(value) => setSettings({ optimizerLevel: value as typeof settings.optimizerLevel })}
                 />
               </Field>
               <div className="flex flex-wrap items-center gap-3">

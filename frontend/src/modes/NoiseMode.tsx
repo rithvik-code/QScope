@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatedNumber, InView } from "../components/motion";
 import type { ModeKey } from "../components/Shell";
-import { Button, Field, Notice, Panel, SectionTitle, Segmented, Select, Slider, StatTile, Tag, WarningList } from "../components/ui";
+import { Button, Field, Notice, Panel, SectionTitle, Select, Slider, StatTile, Tag, WarningList } from "../components/ui";
 import { CompareBars, InspectBars, LineChart } from "../components/viz/charts";
 import { fidelityWords, formatPercent, sortedProbabilities } from "../lib/format";
 import { api, type NoiseSpec } from "../lib/api";

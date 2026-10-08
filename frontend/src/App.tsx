@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Component, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
 import { Shell, type ModeKey } from "./components/Shell";
 import { TransitionPanel } from "./components/motion";
 import { Notice } from "./components/ui";
@@ -14,6 +14,41 @@ import { NoiseMode } from "./modes/NoiseMode";
 import { OptimizeMode } from "./modes/OptimizeMode";
 import { ResearchMode } from "./modes/ResearchMode";
 import { TraceMode } from "./modes/TraceMode";
+
+/**
+ * A fault in one view must not take the whole instrument down: the engine keeps
+ * running, the log keeps its entries, and the failure is reported instead of
+ * leaving a blank page behind.  React unmounts the subtree on an uncaught error,
+ * so this boundary is what makes the rest of the interface survive.
+ */
+class ModeBoundary extends Component<{ children: ReactNode; resetKey: string }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("QScope view failed", error, info.componentStack);
+  }
+
+  componentDidUpdate(previous: { resetKey: string }) {
+    if (previous.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <Notice tone="danger" title="This view failed to render">
+        <p className="mono-num text-[11px]">{this.state.error.message}</p>
+        <p className="mt-1">
+          The API and the stored history are unaffected. Switch to Mission Control and the rest of the environment keeps
+          working; the browser console has the full stack.
+        </p>
+      </Notice>
+    );
+  }
+}
 
 function Workspace() {
   const [mode, setMode] = useState<ModeKey>("control");
@@ -59,7 +94,9 @@ function Workspace() {
           <Notice tone="info">Loading the engine catalogue…</Notice>
         </div>
       )}
-      <TransitionPanel activeKey={mode}>{view}</TransitionPanel>
+      <ModeBoundary resetKey={mode}>
+        <TransitionPanel activeKey={mode}>{view}</TransitionPanel>
+      </ModeBoundary>
     </Shell>
   );
 }

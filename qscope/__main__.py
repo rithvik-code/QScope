@@ -65,9 +65,16 @@ def main(argv: list[str] | None = None) -> int:
 
     import uvicorn
 
-    from qscope.api import app as application
+    # ``qscope.api.app`` is a module (see qscope/api/__init__.py), so the instance has to be
+    # taken from inside it: ``from qscope.api import app`` would hand uvicorn the module and
+    # fail with "'module' object is not callable" on the first request.
+    if args.reload:
+        # The reloader requires an import string and re-imports it in a child process.
+        target: object = "qscope.api.app:app"
+    else:
+        from qscope.api.app import app as application
 
-    target = "qscope.api.app:app" if args.reload else application
+        target = application
     banner = f"QScope {__version__} — http://{args.host}:{args.port}"
     print(banner)
     print(f"  API docs    http://{args.host}:{args.port}/api/docs")

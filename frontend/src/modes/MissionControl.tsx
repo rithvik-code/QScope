@@ -228,7 +228,7 @@ export function MissionControl({ onNavigate }: { onNavigate: (mode: ModeKey) => 
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-[11px] font-medium">{algorithm.name}</span>
                     <span className="mono-num shrink-0 text-[10px] text-[var(--c-faint)]">
-                      {algorithm.resources.num_qubits}q · {algorithm.resources.gates}g
+                      {algorithm.qubits}q · {algorithm.gates}g
                     </span>
                   </div>
                   <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-[var(--c-muted)]">

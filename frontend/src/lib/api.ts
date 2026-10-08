@@ -81,6 +81,8 @@ export interface Plan {
   warnings: string[];
   notes: string[];
   auto_selected: boolean;
+  /** Where the memory budget came from: an explicit value, the environment, or the host. */
+  budget?: { budget_mb: number; source: string };
 }
 
 export interface NoiseSpec {
@@ -446,12 +448,15 @@ export interface BenchmarkPayload {
   method?: string;
   caveats?: string[];
   environment?: Record<string, string>;
-  backends?: Record<string, unknown>;
+  backends?: Array<Record<string, unknown>> | Record<string, unknown>;
   memory?: Record<string, unknown>;
   external?: Array<Record<string, unknown>>;
   budget_bytes?: number;
   budget_mb?: number;
-  backend_tables?: Record<string, Array<{ qubits: number; amplitudes?: number; bytes: number; mb: number }>>;
+  backend_tables?: Record<
+    string,
+    Array<{ qubits: number; amplitudes?: number; bytes: number; mb: number; human?: string; fits_budget?: boolean }>
+  >;
   safe_max_qubits?: Record<string, number>;
   detected?: Array<{ module: string; name: string; available: boolean; version?: string | null; note?: string }>;
   results?: Array<{
@@ -511,13 +516,12 @@ export interface Meta {
     category: string;
     difficulty: string;
     parameters: Record<string, unknown>;
-    explanation: string[];
-    steps: string[];
-    complexity: string;
-    expected_outcome: Record<string, unknown>;
-    analytic: Record<string, unknown>;
-    resources: Resources;
     tags: string[];
+    complexity: string;
+    /** Size and cost of the catalogue's own default circuit — what gets loaded on selection. */
+    qubits: number;
+    gates: number;
+    depth: number;
   }>;
   hardware: Array<{
     key: string;
@@ -531,7 +535,19 @@ export interface Meta {
     notes: string;
   }>;
   experiments: Array<{ key: string; name: string; kind: string; description: string; factory: string; defaults: Record<string, unknown> }>;
-  backends: Array<{ key: string; label: string; representation: string; exact: boolean; description: string; estimated_bytes_per_qubit: number }>;
+  backends: Array<{
+    key: string;
+    label: string;
+    representation: string;
+    exact: boolean;
+    supports_noise: boolean;
+    supports_midcircuit_measurement: boolean;
+    max_practical_qubits: number;
+    safe_max_qubits: number;
+    description: string;
+    tradeoff: string;
+    bytes_per_qubit_expression: string;
+  }>;
   noise_models: Array<{ kind: string; params: string[]; description: string; defaults: Record<string, number> }>;
   optimizer_levels: Array<{ key: string; label: string; description: string; passes: string[] }>;
   whatif: Array<{ kind: string; label: string; shape: Record<string, unknown> }>;

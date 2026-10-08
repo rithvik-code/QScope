@@ -251,6 +251,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       evolution,
       experiment,
       experimentProgress,
+      benchmark,
       answer,
       report,
       history,
