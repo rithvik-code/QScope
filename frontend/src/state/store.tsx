@@ -11,6 +11,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   api,
   ApiError,
+  downloadBlob,
+  streamExperiment as openExperimentStream,
   streamTrace as openTraceStream,
   type AIAnswer,
   type Backend,
@@ -94,6 +96,7 @@ interface StoreValue {
   hardware: HardwareReport | null;
   evolution: Awaited<ReturnType<typeof api.evolve>> | null;
   experiment: ExperimentOutcome | null;
+  experimentProgress: { index: number; total: number; label: string } | null;
   benchmark: BenchmarkPayload | null;
   answer: AIAnswer | null;
   report: ReportPayload | null;
@@ -119,6 +122,9 @@ interface StoreValue {
   analyseHardware: (device: string, route: boolean) => Promise<void>;
   evolve: (generations: number, population: number) => Promise<void>;
   runExperiment: (request: Record<string, unknown>) => Promise<void>;
+  /** Runs a sweep over the websocket, reporting progress point by point. */
+  streamExperiment: (request: Record<string, unknown>) => { close: () => void };
+  exportReport: (request: Parameters<typeof api.report>[0], format: string) => Promise<void>;
   runBenchmark: (request: Record<string, unknown>) => Promise<void>;
   ask: (body: Record<string, unknown>) => Promise<void>;
   buildReport: (kind: string, payload: Record<string, unknown>, title?: string, objective?: string) => Promise<void>;
@@ -151,6 +157,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [hardware, setHardware] = useState<HardwareReport | null>(null);
   const [evolution, setEvolution] = useState<StoreValue["evolution"]>(null);
   const [experiment, setExperiment] = useState<ExperimentOutcome | null>(null);
+  const [experimentProgress, setExperimentProgress] = useState<StoreValue["experimentProgress"]>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkPayload | null>(null);
   const [answer, setAnswer] = useState<AIAnswer | null>(null);
   const [report, setReport] = useState<ReportPayload | null>(null);
@@ -243,7 +250,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       hardware,
       evolution,
       experiment,
-      benchmark,
+      experimentProgress,
       answer,
       report,
       history,
@@ -506,6 +513,51 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
       },
 
+      streamExperiment: (request) => {
+        let closed = false;
+        setExperiment(null);
+        setExperimentProgress(null);
+        setLoading((state) => ({ ...state, experiment: true }));
+        const handle = openExperimentStream(request, {
+          onStart: (event) => {
+            if (!closed) setExperimentProgress({ index: 0, total: event.total, label: "starting" });
+          },
+          onProgress: (event) => {
+            if (!closed) setExperimentProgress({ index: event.index, total: event.total, label: event.label });
+          },
+          onDone: (outcome) => {
+            setLoading((state) => ({ ...state, experiment: false }));
+            setExperimentProgress(null);
+            setExperiment(outcome);
+            note("experiment (live)", `${outcome.rows.length} points: ${outcome.headline}`);
+            void api.history({ limit: 20 }).then((page) => setHistory(page.experiments));
+          },
+          onError: (message) => {
+            setLoading((state) => ({ ...state, experiment: false }));
+            setExperimentProgress(null);
+            setErrors((state) => ({ ...state, experiment: message }));
+            note("experiment (live)", message, false);
+          },
+        });
+        return {
+          close: () => {
+            closed = true;
+            setLoading((state) => ({ ...state, experiment: false }));
+            setExperimentProgress(null);
+            handle.close();
+          },
+        };
+      },
+
+      exportReport: async (request, format) => {
+        await runFor("report", async () => {
+          const blob = await api.reportExport(request, format);
+          const stem = (request.title ?? request.kind).replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 80) || "qscope-report";
+          downloadBlob(blob, `${stem}.${format === "markdown" ? "md" : format}`);
+          note("export", `${request.kind} report · ${format} · ${(blob.size / 1024).toFixed(1)} KB`);
+        });
+      },
+
       runBenchmark: async (request) => {
         await runFor("benchmark", async () => {
           const started = performance.now();
@@ -567,6 +619,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     evolution,
     experiment,
     experimentId,
+    experimentProgress,
     hardware,
     health,
     history,

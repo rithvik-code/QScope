@@ -433,10 +433,15 @@ export interface BenchmarkPayload {
   fit?: {
     available: boolean;
     reason?: string;
-    base?: number;
-    per_qubit_factor?: number;
-    formula?: string;
+    model?: string;
+    /** Empirical runtime multiplier per added qubit, fitted from the measurements. */
+    multiplier_per_added_qubit?: number;
+    doubling_qubits?: number | null;
+    r_squared?: number;
+    a?: number;
+    measurements?: Array<{ qubits: number; measured_seconds: number; predicted_seconds: number }>;
     extrapolations?: Array<{ qubits: number; predicted_seconds: number; predicted_memory_mb?: number; label: string }>;
+    note?: string;
   };
   method?: string;
   caveats?: string[];
@@ -448,6 +453,24 @@ export interface BenchmarkPayload {
   budget_mb?: number;
   backend_tables?: Record<string, Array<{ qubits: number; amplitudes?: number; bytes: number; mb: number }>>;
   safe_max_qubits?: Record<string, number>;
+  detected?: Array<{ module: string; name: string; available: boolean; version?: string | null; note?: string }>;
+  results?: Array<{
+    backend: string;
+    available: boolean;
+    median_seconds?: number;
+    spread_seconds?: number;
+    shots?: number;
+    exact?: boolean;
+    note?: string;
+    reason?: string;
+    agreement_with_qscope?: { total_variation: number; sampling_floor: number; consistent: boolean; note: string };
+  }>;
+  circuit?: string;
+  gates?: number;
+  num_qubits?: number;
+  scaling?: BenchmarkPayload;
+  mode?: Mode;
+  mode_label?: string;
   notes?: string[];
   disclaimer?: string;
   request?: Record<string, unknown>;
@@ -608,6 +631,54 @@ const post = <T,>(path: string, body: unknown) => request<T>(path, { method: "PO
 const get = <T,>(path: string) => request<T>(path);
 const del = <T,>(path: string) => request<T>(path, { method: "DELETE" });
 
+/** POSTs a body and keeps the response as bytes — used for report exports. */
+async function postBlob(path: string, body: unknown): Promise<Blob> {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    let detail: unknown = text;
+    try {
+      detail = JSON.parse(text);
+    } catch {
+      /* the body was not JSON; keep the raw text */
+    }
+    const payload = detail as { detail?: unknown } | null;
+    const inner = payload?.detail as { detail?: string; error?: string } | undefined;
+    throw new ApiError(
+      typeof payload?.detail === "string" ? payload.detail : inner?.detail ?? inner?.error ?? `export failed with ${response.status}`,
+      response.status,
+    );
+  }
+  return response.blob();
+}
+
+/** Hands a blob to the browser as a download. */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+export const REPORT_FORMATS = ["html", "pdf", "json", "csv", "markdown"] as const;
+export type ReportFormat = (typeof REPORT_FORMATS)[number];
+
+export interface ReportRequest {
+  kind: string;
+  title?: string | null;
+  objective?: string | null;
+  save?: boolean;
+  payload: Record<string, unknown>;
+}
+
 export interface SimulateRequest {
   source: CircuitSource;
   backend?: Backend;
@@ -737,10 +808,13 @@ export const api = {
   benchmark: (body: { kind: string; qubits?: number[]; depth?: number; shots?: number; trials?: number; backends?: Backend[]; seed?: number }) =>
     post<BenchmarkPayload>("/api/benchmark", body),
 
-  report: (body: { kind: string; title?: string | null; objective?: string | null; save?: boolean; payload: Record<string, unknown> }) =>
-    post<ReportPayload>("/api/report", body),
-  reportExportUrl: (format: string) => `/api/report/export?format=${format}`,
+  report: (body: ReportRequest) => post<ReportPayload>("/api/report", body),
+  /** Renders the same report to a downloadable artifact (POST, returned as bytes). */
+  reportExport: (body: ReportRequest, format: ReportFormat | string) =>
+    postBlob(`/api/report/export?format=${format}`, body),
   listReports: () => get<{ dir: string; files: Array<{ name: string; bytes: number; modified: string; format: string }> }>("/api/reports"),
+  /** A saved report is served back from the reports directory by name. */
+  reportFileUrl: (name: string) => `/api/reports/${encodeURIComponent(name)}`,
 
   ask: (body: Record<string, unknown>) => post<AIAnswer>("/api/ai/ask", body),
   aiSuggestions: () =>
