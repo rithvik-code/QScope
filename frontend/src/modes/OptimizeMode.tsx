@@ -58,8 +58,56 @@ export function OptimizeMode({ onNavigate }: { onNavigate: (mode: ModeKey) => vo
 
   const verification = optimization ? PROOF_LABELS[optimization.verification.status] : null;
 
-  return (
-    <div className="space-y-4">
+  return (      <div className="space-y-4">
+      <FieldGuide
+        modeName="Optimize"
+        onDismiss={() => {}}
+        slides={[
+          {
+            heading: "What you are looking at",
+            steps: [
+              {
+                title: "The optimiser tab is the one you will use first",
+                body: "The Verified optimisation panel is where you pick a level and whether to verify every rewrite, then press optimise. The result panel reports passes applied, the before → after gate count, depth, two-qubit gates, and the gate reduction fraction, all with the verification status attached. A saving that could not be verified is shown as failed, not as an improvement.",
+                pointer: "Verified optimisation panel → level, verify / parse only, optimise; Result panel → passes, gates, depth, 2-qubit gates, reduction, verification tag",
+              },
+              {
+                title: "Circuit evolution is a search, not a single rewrite",
+                body: "The evolution tab runs a population of candidate circuits for a number of generations and reports the best one it found, with the verification status of the final result. The hardware mapping tab is a different question: it estimates how the current circuit would sit on a specific device topology.",
+                pointer: "segmented control — optimiser / circuit evolution / hardware mapping; evolution panel → generations, population, evolve; hardware panel → device, analyse hardware",
+              },
+              {
+                title: "The proof is part of the result, not an footnote",
+                body: "Every optimisation result carries a verification label — proven equivalent, verified on random inputs, verification failed, or not verified. If verification is on and a rewrite did not reproduce the original, it is rolled back. If verification is off, the result is reported as NOT_VERIFIED so you can see the difference.",
+                pointer: "Result panel → verification tag and method; the proof line under the result",
+                tip: "verification is optional but the label is always shown",
+              },
+            ],
+          },
+          {
+            heading: "How to use this page",
+            steps: [
+              {
+                title: "Start from a circuit you can compare against",
+                body: "The optimiser reads the circuit that is currently loaded. If you have not built or executed one yet the panels will still render, but the before → after comparison you care about needs a circuit to begin with. Load one from Build, or execute one from Execute and come back.",
+                pointer: "top bar — the loaded circuit name, gates and depth; if it says no circuit, go load one first",
+                highlight: 1,
+                tip: "one loaded circuit is enough to start",
+              },
+              {
+                title: "Pick a level, decide on verification, then optimise",
+                body: "The level selector chooses how aggressive the rewrites are — the hint under it says what each level does. Verification compares segment unitaries, so it is slower but gives you a proof. With it off you get a faster parse-only pass that is reported as NOT_VERIFIED. The first time, the safe choice is verify every rewrite.",
+                pointer: "level → select; verify every rewrite / parse only → segmented; optimise → primary button",
+              },
+              {
+                title: "Load the optimised circuit when you want to keep it",
+                body: "If the result has an optimised circuit, the load optimised circuit button puts it back into the editor so you can run it again, trace it, or optimise it further. The optimiser itself does not replace the circuit you started with — you choose when to take the result.",
+                pointer: "Result panel actions → load optimised circuit; then run it from Execute or trace it from Trace",
+              },
+            ],
+          },
+        ]}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Segmented
           value={tab}

@@ -41,7 +41,7 @@ interface FieldGuideProps {
 
 const STORAGE_KEY = "qscope.guide.dismissed.v1";
 
-function dismissedModes(): Set<string> {
+function dismissedModes(): ReadonlySet<string> {
   try {
     const raw = typeof localStorage !== "undefined" ? (localStorage.getItem(STORAGE_KEY) ?? "") : "";
     return new Set(raw.split(",").filter(Boolean));

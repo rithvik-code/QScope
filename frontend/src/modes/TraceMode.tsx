@@ -60,8 +60,55 @@ export function TraceMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
     [trace],
   );
 
-  return (
-    <div className="space-y-4">
+  return (      <div className="space-y-4">
+      <FieldGuide
+        modeName="Trace"
+        onDismiss={() => {}}
+        slides={[
+          {
+            heading: "What you are looking at",
+            steps: [
+              {
+                title: "Left column is the debugger, right column is the stage",
+                body: "The Debugger panel on the left is where you choose how much the engine measures at every step — analysis depth, how many amplitudes to report, the pace of a live stream. The Circuit panel on the right is the stage: the highlighted gate is the step you are standing on, and the diagram keeps its place as you step through.",
+                pointer: "Debugger panel → analysis depth, amplitudes per step, compute full trace, stream live, stream pace; Circuit panel → highlighted gate",
+              },
+              {
+                title: "The step panel is the gate you are standing on",
+                body: "Each step opens a panel with the gate name, its layer and targets, the step and cumulative time, the norm and purity of the state, the measurement if there was one, the state amplitudes, and one Bloch sphere per qubit. Below that is the Quantum Diff, which tells you what that single gate changed.",
+                pointer: "step panel → step time, cumulative, norm, purity, state amplitudes, Bloch vectors; Quantum Diff → probability moved, entanglement before → after",
+              },
+              {
+                title: "The bottom tools are play, history and the boundaries",
+                body: "The All steps list is the gate history — click any row to jump, and the bar beside it shows how much that step moved the state. The Probability distribution panel shows the state at the current step. The Not in the trace panel is honest about what a gate-by-gate trace cannot answer, and the Take it further panel points to the rest of the platform.",
+                pointer: "All steps list → jump by clicking; Probability distribution → current step; Not in the trace → boundaries; Take it further → where to go next",
+              },
+            ],
+          },
+          {
+            heading: "How to use this page",
+            steps: [
+              {
+                title: "Choose your depth before you trace",
+                body: "The analysis depth control is the one decision that changes cost. Fast gives you snapshots, diffs and cheap metrics only. Standard adds per-qubit entanglement entropy. Full adds pairwise concurrence, which costs more as the pair count grows. Set amplitudes per step separately — that is how many basis states the step panel shows.",
+                pointer: "analysis depth → fast / standard / full; amplitudes reported per step → number input",
+                highlight: 3,
+                tip: "depth choices",
+              },
+              {
+                title: "Compute the full trace to jump, stream live to watch",
+                body: "Compute full trace builds the whole step list in one call, which is what lets you jump around and scrub. Stream live runs the engine gate by gate as it produces them, which is what makes it feel like a debugger. Both come from the same iter_trace path, so the numbers agree when a full trace is available.",
+                pointer: "compute full trace → primary button; stream live → outline button; stop → ghost button while streaming",
+              },
+              {
+                title: "Step through with the playback controls",
+                body: "Use first, step, play, step, last to move through an already-computed trace. The slider below them scrubs directly. Measurements inside a trace collapse the state with a fixed seed, so a trace is reproducible — including the random outcomes — but a single trace is one possible branch.",
+                pointer: "playback → first / step / play / step / last and the slider",
+              },
+            ],
+          },
+        ]}
+      />
       <div className="grid gap-4 xl:grid-cols-[300px_1fr]">
         {/* --------------------------------------------------------- controls */}
         <div className="space-y-3">
