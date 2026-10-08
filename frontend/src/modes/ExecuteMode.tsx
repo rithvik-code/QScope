@@ -44,13 +44,27 @@ export function ExecuteMode({ onNavigate }: { onNavigate: (mode: ModeKey) => voi
   }>;
 
   const shotRecords = result?.shot_records ?? [];
+  const guideRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
-        {/* -------------------------------------------------------- controls */}
-        <div className="space-y-3">
-          <Panel title="Run settings" subtitle="These are the exact values recorded with the result." dense>
+      <FieldGuide
+        modeName="Execute"
+        onDismiss={() => {}}
+        slides={[
+          {
+            heading: "What you are looking at",
+            steps: [
+              {
+                title: "Left column: the exact values recorded with the run",
+                body: "The Run settings panel is where you choose shots, seed, engine, noise strength, and whether to keep this run in history. These are the values the engine will record — not a separate ‘confirm’ step. The Execution plan below it tells you which engine was chosen and what it will cost: state size, peak memory, budget, and a safe max qubit count.",
+                pointer: "Run settings → shots, seed, engine, noise strength, memorise in history; Execution plan → state size, peak, budget, safe max",
+              },
+              {
+                title: "Top-right: the result, with provenance baked in",
+                body: "After you press execute, the Result panel shows the mode the run ran under (SIMULATED, NOISY SIMULATION, or REAL HARDWARE), the backend and representation the engine picked, the shot count and seed, and the provenance strip that says exactly what was computed. From there you can trace every gate, or jump to the analyse view.",
+                pointer: "Result caption → mode, backend, shots, seed, noise; Provenance strip",
+                tip: "provable provenance strip
             <div className="space-y-3">
               <Field label="shots">
                 <div className="space-y-1.5">
