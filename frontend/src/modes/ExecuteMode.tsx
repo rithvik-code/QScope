@@ -15,6 +15,7 @@ import { AmplitudeBars, DensityView, PhaseDial } from "../components/viz/quantum
 import type { ModeKey } from "../components/Shell";
 import { formatBytes, formatMegabytes, formatPercent, formatSeconds, sortedCounts, sortedProbabilities } from "../lib/format";
 import { useStore } from "../state/store";
+import { FieldGuide } from "../components/Guide";
 
 export function ExecuteMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void }) {
   const {
@@ -46,9 +47,9 @@ export function ExecuteMode({ onNavigate }: { onNavigate: (mode: ModeKey) => voi
   const shotRecords = result?.shot_records ?? [];
 
   return (
-    <div className="space-y-4">          <FieldGuide
-            modeName="Execute"
-            onDismiss={() => {}}
+    <div className="space-y-4">
+      <FieldGuide
+        modeName="Execute"
         slides={[
           {
             heading: "What you are looking at",

@@ -16,6 +16,7 @@ import { Sparkline } from "../components/viz/charts";
 import { AmplitudeBars, BlochSphere, CircuitCanvas, StateDiff } from "../components/viz/quantum";
 import { formatSeconds } from "../lib/format";
 import { useStore } from "../state/store";
+import { FieldGuide } from "../components/Guide";
 
 export function TraceMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void }) {
   const { trace, liveStep, settings, setSettings, loading, errors, traceCircuit, streamTrace } = useStore();
@@ -60,10 +61,10 @@ export function TraceMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
     [trace],
   );
 
-  return (      <div className="space-y-4">
+  return (
+    <div className="space-y-4">
       <FieldGuide
         modeName="Trace"
-        onDismiss={() => {}}
         slides={[
           {
             heading: "What you are looking at",

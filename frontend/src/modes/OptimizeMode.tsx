@@ -14,6 +14,7 @@ import { CompareBars, LineChart } from "../components/viz/charts";
 import { CircuitCanvas } from "../components/viz/quantum";
 import { formatSeconds } from "../lib/format";
 import { useStore } from "../state/store";
+import { FieldGuide } from "../components/Guide";
 
 const PROOF_LABELS: Record<string, { label: string; colour: string; note: string }> = {
   PROVEN_EQUIVALENT: {
@@ -58,10 +59,10 @@ export function OptimizeMode({ onNavigate }: { onNavigate: (mode: ModeKey) => vo
 
   const verification = optimization ? PROOF_LABELS[optimization.verification.status] : null;
 
-  return (      <div className="space-y-4">
+  return (
+    <div className="space-y-4">
       <FieldGuide
         modeName="Optimize"
-        onDismiss={() => {}}
         slides={[
           {
             heading: "What you are looking at",
