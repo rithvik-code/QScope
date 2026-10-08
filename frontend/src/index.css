@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Realtime Colors token model
+   ---------------------------------------------------------------------------
+   A palette is five decisions — text, background, primary, secondary, accent —
+   plus generated neutral ramps.  Every colour the interface uses is one of these
+   variables, which is what lets the palette studio change the whole app live
+   without touching a component.  The ramps are derived at runtime (see
+   theme/theme.ts) and written onto :root by the ThemeProvider.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* sensible dark-scientific defaults so the first paint is already correct */
+  --rtc-text: #e9edf5;
+  --rtc-background: #080a10;
+  --rtc-primary: #6ee7c8;
+  --rtc-secondary: #7aa2ff;
+  --rtc-accent: #ff8ad4;
+
+  --rtc-grey-50: #f4f6fb;
+  --rtc-grey-100: #e2e6ef;
+  --rtc-grey-200: #c6ccdb;
+  --rtc-grey-300: #a3abc0;
+  --rtc-grey-400: #7e8699;
+  --rtc-grey-500: #5e6678;
+  --rtc-grey-600: #454b5a;
+  --rtc-grey-700: #2f3441;
+  --rtc-grey-800: #1d212b;
+  --rtc-grey-900: #12151d;
+  --rtc-grey-950: #0b0d13;
+
+  --rtc-tint-100: #e8fdf7;
+  --rtc-tint-200: #c8f8ec;
+  --rtc-tint-300: #9deedd;
+  --rtc-tint-400: #6ee7c8;
+  --rtc-tint-500: #3ec9a8;
+  --rtc-tint-600: #23a488;
+  --rtc-tint-700: #1b826d;
+  --rtc-tint-800: #186654;
+  --rtc-tint-900: #155446;
+
+  /* semantic surface tokens, derived from the ramp */
+  --c-bg: var(--rtc-background);
+  --c-panel: color-mix(in oklab, var(--rtc-background) 84%, var(--rtc-text) 6%);
+  --c-panel-2: color-mix(in oklab, var(--rtc-background) 76%, var(--rtc-text) 10%);
+  --c-line: color-mix(in oklab, var(--rtc-background) 62%, var(--rtc-text) 18%);
+  --c-line-strong: color-mix(in oklab, var(--rtc-background) 48%, var(--rtc-text) 30%);
+  --c-text: var(--rtc-text);
+  --c-muted: color-mix(in oklab, var(--rtc-text) 68%, var(--rtc-background));
+  --c-faint: color-mix(in oklab, var(--rtc-text) 44%, var(--rtc-background));
+  --c-primary: var(--rtc-primary);
+  --c-secondary: var(--rtc-secondary);
+  --c-accent: var(--rtc-accent);
+  --c-warn: #ffb865;
+  --c-danger: #ff6b81;
+  --c-ok: #57d38c;
+}
+
+@theme inline {
+  --color-bg: var(--c-bg);
+  --color-panel: var(--c-panel);
+  --color-panel2: var(--c-panel-2);
+  --color-line: var(--c-line);
+  --color-linestrong: var(--c-line-strong);
+  --color-text: var(--c-text);
+  --color-muted: var(--c-muted);
+  --color-faint: var(--c-faint);
+  --color-primary: var(--c-primary);
+  --color-secondary: var(--c-secondary);
+  --color-accent: var(--c-accent);
+  --color-warn: var(--c-warn);
+  --color-danger: var(--c-danger);
+  --color-ok: var(--c-ok);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  --animate-shimmer: shimmer 2.6s linear infinite;
+  --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
+  --animate-drift: drift 26s ease-in-out infinite alternate;
+  --animate-sweep: sweep 5.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 50%; }
+  100% { background-position: -200% 50%; }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(0, -2.5%, 0) scale(1.05); }
+}
+@keyframes sweep {
+  0%, 100% { transform: translateX(-8%); opacity: 0.35; }
+  50% { transform: translateX(8%); opacity: 0.6; }
+}
+@keyframes dash {
+  to { stroke-dashoffset: -1000; }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv05" 1, "ss01" 1, "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--c-primary) 38%, transparent);
+  color: var(--c-text);
+}
+
+/* thin, unobtrusive scrollbars everywhere (it is an instrument, not a brochure) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--c-line-strong);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--c-primary);
+  background-clip: content-box;
+}
+
+@utility panel {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--c-panel-2) 92%, transparent),
+    color-mix(in oklab, var(--c-panel) 96%, transparent)
+  );
+  border: 1px solid var(--c-line);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+}
+
+@utility panel-flat {
+  background: color-mix(in oklab, var(--c-panel) 92%, transparent);
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+}
+
+@utility label-xs {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--c-faint);
+  font-weight: 600;
+}
+
+@utility mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+@utility glow-ring {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--c-primary) 28%, transparent),
+    0 0 26px -8px color-mix(in oklab, var(--c-primary) 55%, transparent);
+}
+
+@utility hairline-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--c-line) 40%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--c-line) 40%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+@utility focus-ring {
+  outline: none;
+  &:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--c-primary) 60%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

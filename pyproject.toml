@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qscope"
+version = "0.1.0"
+description = "See inside quantum computing — a research environment for building, tracing, optimizing and experimenting with quantum programs."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "QScope" }]
+keywords = ["quantum", "simulator", "debugger", "research", "experiment", "benchmark"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+  # The mathematical core, the simulator and the optimiser are NumPy only.
+  "numpy>=1.26",
+  # API layer.  FastAPI pulls in Starlette and Pydantic.
+  "fastapi>=0.110",
+  "uvicorn>=0.27",
+  "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+# Only needed if you want the assistant to narrate its (already grounded) answers.
+llm = ["httpx>=0.27"]
+
+[project.scripts]
+qscope = "qscope.__main__:main"
+
+[project.urls]
+Documentation = "https://github.com/qscope/qscope#readme"
+
+[tool.setuptools]
+packages = [
+  "qscope",
+  "qscope.core",
+  "qscope.circuit",
+  "qscope.simulator",
+  "qscope.debugger",
+  "qscope.analysis",
+  "qscope.optimizer",
+  "qscope.algorithms",
+  "qscope.experiments",
+  "qscope.hardware",
+  "qscope.evolution",
+  "qscope.ai",
+  "qscope.api",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]

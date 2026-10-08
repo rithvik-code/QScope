@@ -20,10 +20,12 @@ Supported kinds
 
 from __future__ import annotations
 
+import inspect
 import itertools
 import math
 import time
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any, Callable, Sequence
 
 import numpy as np
@@ -250,6 +252,48 @@ class ExperimentOutcome:
 # ---------------------------------------------------------------------------
 
 
+@lru_cache(maxsize=None)
+def accepted_parameters(key: str) -> frozenset[str]:
+    """Keyword parameters an algorithm factory actually accepts.
+
+    A sweep axis like ``num_qubits`` is meaningless for an algorithm that has no
+    size (``bell_state`` is always two qubits).  Passing it anyway would raise
+    inside the factory and silently skip the point, so unknown keywords are
+    dropped here and reported through :func:`unsupported_parameters`.
+    """
+    factory = ALGORITHMS.get(key)
+    if factory is None:
+        return frozenset()
+    try:
+        signature = inspect.signature(factory)
+    except (TypeError, ValueError):  # pragma: no cover - builtins
+        return frozenset()
+    return frozenset(
+        name
+        for name, parameter in signature.parameters.items()
+        if parameter.kind
+        in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+    )
+
+
+def unsupported_parameters(params: dict[str, Any], key: str) -> list[str]:
+    """Requested parameters this algorithm cannot use (for warnings and the UI)."""
+    accepted = accepted_parameters(key)
+    interesting = {
+        "num_qubits",
+        "layers",
+        "iterations",
+        "theta",
+        "phase",
+        "secret",
+        "marked",
+        "oracle",
+        "mask",
+        "counting_qubits",
+    }
+    return sorted(name for name in params if name in interesting and name not in accepted)
+
+
 def _algorithm_for(params: dict[str, Any], algorithm: str | None) -> AlgorithmSpec:
     """Build the algorithm spec for one parameter point."""
     key = algorithm or str(params.get("algorithm", "grover"))
@@ -273,6 +317,9 @@ def _algorithm_for(params: dict[str, Any], algorithm: str | None) -> AlgorithmSp
     if key == "quantum_phase_estimation":
         args["counting_qubits"] = int(params.get("num_qubits", params.get("counting_qubits", 4)) or 4)
         args.pop("num_qubits", None)
+    accepted = accepted_parameters(key)
+    if accepted:
+        args = {name: value for name, value in args.items() if name in accepted}
     return build_algorithm(key, **args)
 
 
@@ -398,6 +445,15 @@ def _run_point(
     if spec.kind == "noise_sweep" and spec.noise_axis_values:
         strength = float(params.get("noise", spec.noise_axis_values[0]))
         noise = _scale_noise(spec.noise, strength)
+    key = spec.algorithm or str(params.get("algorithm", "grover"))
+    dropped = unsupported_parameters(params, key)
+    if dropped:
+        warnings.append(
+            f"{key} does not take {', '.join(dropped)}; the axis was ignored for this point "
+            f"(the algorithm is always {ALGORITHMS[key]().circuit.num_qubits}-qubit)"
+            if key in ALGORITHMS
+            else f"{key} does not take {', '.join(dropped)}; the axis was ignored"
+        )
     try:
         algorithm_spec = _algorithm_for(params, spec.algorithm)
         circuit = algorithm_spec.circuit.copy()

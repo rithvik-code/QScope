@@ -908,8 +908,6 @@ def create_app() -> FastAPI:
                 shots=request.shots,
                 seed=request.seed,
             )
-            if not sized:
-                spec.fixed.pop("num_qubits", None)
         elif request.kind == "backend_comparison":
             spec = backend_comparison(
                 algorithm,
@@ -918,8 +916,6 @@ def create_app() -> FastAPI:
                 noise=noise,
                 seed=request.seed,
             )
-            if not sized:
-                spec.fixed.pop("num_qubits", None)
         elif request.kind == "optimizer_comparison":
             spec = optimizer_comparison(
                 algorithm,
@@ -928,8 +924,6 @@ def create_app() -> FastAPI:
                 shots=request.shots,
                 seed=request.seed,
             )
-            if not sized:
-                spec.fixed.pop("num_qubits", None)
         elif request.kind == "shots_convergence":
             spec = shots_convergence(
                 algorithm,
@@ -938,8 +932,6 @@ def create_app() -> FastAPI:
                 noise=noise,
                 seed=request.seed,
             )
-            if not sized:
-                spec.fixed.pop("num_qubits", None)
         elif request.kind == "parameter_sweep":
             axis = next(iter(axes), "gamma")
             spec = parameter_sweep(

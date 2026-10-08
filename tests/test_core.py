@@ -92,27 +92,46 @@ def test_every_gate_in_the_catalog_is_unitary(name: str) -> None:
     entry = CATALOG[name]
     arity = entry["num_qubits"]
     params = [0.7] * len(entry["params"])
-    matrix = np.asarray(gate_matrix(name, params), dtype=complex)
-    size = 2**arity
-    assert matrix.shape == (size, size), f"{name}: expected {size}x{size}"
+    if arity < 1:
+        # variadic gates (MCX ...) declare no fixed arity, so ask for three wires
+        arity, matrix = 3, np.asarray(gate_matrix(name, params, num_qubits=3), dtype=complex)
+    else:
+        matrix = np.asarray(gate_matrix(name, params), dtype=complex)
+    size = matrix.shape[0]
+    assert matrix.shape == (size, size)
+    assert size == 2**arity, f"{name}: {size}x{size} does not match arity {arity}"
     assert np.allclose(matrix.conj().T @ matrix, np.eye(size), atol=1e-12), name
-    assert np.allclose(np.asarray(entry["matrix"], dtype=complex), gate_matrix(name, [0.7] * 0), atol=1e-12) if not entry["params"] else True
+    assert np.isclose(abs(np.linalg.det(matrix)), 1.0, atol=1e-12), name
+
+
+def same_state_up_to_phase(actual: np.ndarray, expected: np.ndarray) -> bool:
+    """True when two normalised vectors differ only by a global phase."""
+    actual, expected = np.asarray(actual), np.asarray(expected)
+    return bool(np.isclose(abs(np.vdot(expected, actual)) / (np.linalg.norm(actual) * np.linalg.norm(expected)), 1.0, atol=1e-12))
 
 
 def test_known_gate_actions() -> None:
     zero = StateVector.zero_state(1)
     plus = StateVector(1, [1 / math.sqrt(2), 1 / math.sqrt(2)])
 
-    assert np.allclose(zero.copy().apply_gate("H", [0]).amplitudes(), plus.amplitudes())
-    assert np.allclose(zero.copy().apply_gate("X", [0]).amplitudes(), [0, 1])
-    assert np.allclose(zero.copy().apply_gate("Z", [0]).amplitudes(), [1, 0])
-    assert np.allclose(zero.copy().apply_gate("S", [0]).amplitudes(), [1, 0])
+    assert same_state_up_to_phase(zero.copy().apply_gate("H", [0]).amplitudes(), plus.amplitudes())
+    assert same_state_up_to_phase(zero.copy().apply_gate("X", [0]).amplitudes(), [0, 1])
+    assert same_state_up_to_phase(zero.copy().apply_gate("Z", [0]).amplitudes(), [1, 0])
+    assert same_state_up_to_phase(zero.copy().apply_gate("S", [0]).amplitudes(), [1, 0])
     # Rx(pi) |0> = -i |1>
-    assert np.allclose(zero.copy().apply_gate("RX", [0], [math.pi]).amplitudes(), [0, -1j])
+    assert same_state_up_to_phase(zero.copy().apply_gate("RX", [0], [math.pi]).amplitudes(), [0, -1j])
     # Ry(pi/2) |0> = (|0> + |1>)/sqrt(2)
-    assert np.allclose(zero.copy().apply_gate("RY", [0], [math.pi / 2]).amplitudes(), [1 / math.sqrt(2), 1 / math.sqrt(2)])
-    # Rz(pi) |+> = |->, i.e. the phase flips sign on |1>
-    assert np.allclose(plus.copy().apply_gate("RZ", [0], [math.pi]).amplitudes(), [1 / math.sqrt(2), -1 / math.sqrt(2)])
+    assert same_state_up_to_phase(
+        zero.copy().apply_gate("RY", [0], [math.pi / 2]).amplitudes(), [1 / math.sqrt(2), 1 / math.sqrt(2)]
+    )
+    # Rz(pi) is -i Z, so |+> becomes -i |->: the relative phase flips, the global one does not matter
+    assert same_state_up_to_phase(
+        plus.copy().apply_gate("RZ", [0], [math.pi]).amplitudes(), [1 / math.sqrt(2), -1 / math.sqrt(2)]
+    )
+    # Rz(pi/2) on |+> gives the phase |0> + i|1>
+    assert same_state_up_to_phase(
+        plus.copy().apply_gate("RZ", [0], [math.pi / 2]).amplitudes(), [1 / math.sqrt(2), 1j / math.sqrt(2)]
+    )
 
 
 def test_phase_gate_powers_follow_the_known_relations() -> None:
@@ -150,7 +169,7 @@ def test_normalize_rescales_an_unnormalised_vector() -> None:
 def test_bell_state_amplitudes_are_exactly_right() -> None:
     circuit = Circuit(2, 2, name="bell")
     circuit.add("H", [0])
-    circuit.add("CNOT", [1], controls=[0])
+    circuit.add("CNOT", [0, 1])
     state = StateVector(2).apply_gate("H", [0]).apply_controlled("X", [0], [1])
 
     amps = state.amplitudes()
@@ -175,8 +194,21 @@ def test_reduced_density_of_bell_state_is_maximally_mixed() -> None:
 
 def test_partial_trace_matches_the_statevector_reduction() -> None:
     bell = StateVector(2, [1 / math.sqrt(2), 0, 0, 1 / math.sqrt(2)])
-    assert np.allclose(partial_trace(bell.density_matrix(), [0], 2), bell.reduced_density([0]), atol=1e-12)
-    assert np.allclose(partial_trace(bell.density_matrix(), [1], 2), bell.reduced_density([1]), atol=1e-12)
+    rho = bell.density_matrix()
+    assert np.allclose(partial_trace(rho, 2, [0]), bell.reduced_density([0]), atol=1e-12)
+    assert np.allclose(partial_trace(rho, 2, [1]), bell.reduced_density([1]), atol=1e-12)
+    assert np.allclose(partial_trace(rho, 2, [0]), np.eye(2) / 2, atol=1e-12)
+    assert np.allclose(partial_trace(rho, 2, [0, 1]), rho, atol=1e-12)
+    # a product state keeps its structure under partial trace: |+>|0> leaves |+> on
+    # qubit 0 and |0> on qubit 1, with no entanglement anywhere
+    product = StateVector(2, np.kron([1 / math.sqrt(2), 1 / math.sqrt(2)], [1, 0]))
+    assert np.allclose(
+        partial_trace(product.density_matrix(), 2, [0]), np.array([[0.5, 0.5], [0.5, 0.5]], dtype=complex), atol=1e-12
+    )
+    assert np.allclose(
+        partial_trace(product.density_matrix(), 2, [1]), np.array([[1, 0], [0, 0]], dtype=complex), atol=1e-12
+    )
+    assert abs(purity(partial_trace(product.density_matrix(), 2, [0])) - 1.0) < 1e-12
 
 
 def test_ghz_state_has_only_two_branches_and_maximal_single_qubit_entropy() -> None:
@@ -197,7 +229,7 @@ def test_bloch_vector_of_the_known_poles() -> None:
     assert np.allclose(_bloch(StateVector.zero_state(1)), [0, 0, 1], atol=1e-12)
     assert np.allclose(_bloch(StateVector(1, [0, 1])), [0, 0, -1], atol=1e-12)
     assert np.allclose(_bloch(StateVector(1, [1 / math.sqrt(2), 1 / math.sqrt(2)])), [1, 0, 0], atol=1e-12)
-    assert np.allclose(_bloch(StateVector(1, [1 / math.sqrt(2), -1j / math.sqrt(2)])), [0, 1, 0], atol=1e-12)
+    assert np.allclose(_bloch(StateVector(1, [1 / math.sqrt(2), -1j / math.sqrt(2)])), [0, -1, 0], atol=1e-12)
     # a maximally mixed qubit has no Bloch vector at all
     bell = DensityMatrix.from_statevector(StateVector(2, [1 / math.sqrt(2), 0, 0, 1 / math.sqrt(2)]))
     mixed = bell.bloch_vector(0)
@@ -345,17 +377,27 @@ def test_concurrence_of_the_four_bell_states() -> None:
         "psi-": [0, 1 / math.sqrt(2), -1 / math.sqrt(2), 0],
     }
     for label, amps in bell.items():
-        rho = DensityMatrix.from_statevector(StateVector(2, amps))
-        assert abs(concurrence(rho, 0, 1) - 1.0) < 1e-9, label
-        assert abs(negativity(rho, 0, 1) - 0.5) < 1e-9, label
+        rho = DensityMatrix.from_statevector(StateVector(2, amps)).data
+        assert abs(concurrence(rho) - 1.0) < 1e-9, label
+        assert abs(negativity(rho, 2, [0]) - 0.5) < 1e-9, label
+
+
+@pytest.mark.parametrize("theta", [0.0, 0.3, 0.7, 1.2])
+def test_concurrence_of_a_family_of_partially_entangled_states(theta: float) -> None:
+    # cos(theta)|00> + sin(theta)|11> has concurrence 2 sin(theta) cos(theta) = sin(2 theta)
+    state = StateVector(2, [math.cos(theta), 0, 0, math.sin(theta)])
+    rho = DensityMatrix.from_statevector(state).data
+    # the eigen-decomposition behind concurrence costs a few ulps
+    assert abs(concurrence(rho) - abs(math.sin(2 * theta))) < 1e-7
+    assert abs(negativity(rho, 2, [0]) - abs(math.sin(2 * theta)) / 2) < 1e-9
 
 
 def test_product_states_are_reported_separable_and_never_as_entangled() -> None:
     product = StateVector(1, [1 / math.sqrt(2), 1 / math.sqrt(2)])
     two = StateVector(2, np.kron(product.amplitudes(), product.amplitudes()))
-    rho = DensityMatrix.from_statevector(two)
-    assert concurrence(rho, 0, 1) < 1e-9
-    assert negativity(rho, 0, 1) < 1e-9
+    rho = DensityMatrix.from_statevector(two).data
+    assert abs(concurrence(rho)) < 1e-9
+    assert abs(negativity(rho, 2, [0])) < 1e-9
     report = entanglement_report(two)
     assert report["status"] == SEPARABLE
     assert report["max_concurrence"] < 1e-9
@@ -369,20 +411,27 @@ def test_product_states_are_reported_separable_and_never_as_entangled() -> None:
 
 def test_partial_transpose_has_the_expected_spectrum() -> None:
     bell = DensityMatrix.from_statevector(StateVector(2, [1 / math.sqrt(2), 0, 0, 1 / math.sqrt(2)]))
-    eigenvalues = np.linalg.eigvalsh(partial_transpose(bell.data, 0, 2))
-    eigenvalues = np.sort(eigenvalues)
+    eigenvalues = np.sort(np.linalg.eigvalsh(partial_transpose(bell.data, 2, [0])))
     assert abs(eigenvalues[0] + 0.5) < 1e-12, eigenvalues
     assert abs(eigenvalues[-1] - 0.5) < 1e-12
+    assert np.allclose(sorted(np.linalg.eigvalsh(partial_transpose(bell.data, 2, [0, 1]))), [0, 0, 0, 1], atol=1e-12)
 
 
 def test_pairwise_concurrence_matrix_is_symmetric_with_zero_diagonal() -> None:
     ghz = DensityMatrix.from_statevector(StateVector(3, [1 / math.sqrt(2), 0, 0, 0, 0, 0, 0, 1 / math.sqrt(2)]))
-    matrix = np.asarray(pairwise_concurrence(ghz))
+    table = pairwise_concurrence(ghz)
+    matrix = np.asarray(table["matrix"])
     assert matrix.shape == (3, 3)
     assert np.allclose(np.diag(matrix), 0.0, atol=1e-12)
     assert np.allclose(matrix, matrix.T, atol=1e-12)
     # in a GHZ state every pair is classically correlated but not pairwise entangled
     assert np.all(matrix < 1e-9)
+    assert len(table["pairs"]) == 3
+
+    bell_pair = pairwise_concurrence(
+        DensityMatrix.from_statevector(StateVector(3, [1 / math.sqrt(2), 0, 0, 0, 0, 0, 0, 1 / math.sqrt(2)]))
+    )
+    assert all(abs(pair["concurrence"]) < 1e-9 for pair in bell_pair["pairs"])
 
 
 # ------------------------------------------------------------------- circuit
@@ -393,8 +442,8 @@ def test_circuit_depth_and_resources_on_a_known_circuit() -> None:
     circuit.add("H", [0])
     circuit.add("H", [1])
     circuit.add("H", [2])
-    circuit.add("CNOT", [1], controls=[0])
-    circuit.add("CNOT", [2], controls=[1])
+    circuit.add("CNOT", [0, 1])
+    circuit.add("CNOT", [1, 2])
     resources = circuit.resources()
     assert resources["gates"] == 5
     assert resources["two_qubit_gates"] == 2
@@ -405,9 +454,9 @@ def test_circuit_depth_and_resources_on_a_known_circuit() -> None:
 
 def test_cnot_direction_matters_and_matches_the_hand_built_matrix() -> None:
     forward = Circuit(2)
-    forward.add("CNOT", [1], controls=[0])
+    forward.add("CNOT", [0, 1])
     backward = Circuit(2)
-    backward.add("CNOT", [0], controls=[1])
+    backward.add("CNOT", [1, 0])
 
     expected_forward = np.eye(4, dtype=complex)
     expected_forward[[2, 3]] = expected_forward[[3, 2]]
@@ -424,7 +473,7 @@ def test_to_unitary_handles_permuted_target_order() -> None:
     assert np.allclose(swap.to_unitary(), np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]], dtype=complex))
 
     toffoli = Circuit(3)
-    toffoli.add("TOFFOLI", [2], controls=[0, 1])
+    toffoli.add("TOFFOLI", [0, 1, 2])
     matrix = toffoli.to_unitary()
     assert np.allclose(matrix @ matrix, np.eye(8), atol=1e-12)  # self-inverse
     assert np.allclose(matrix[0, 0], 1.0)
@@ -450,7 +499,7 @@ def test_qasm_round_trip_preserves_the_unitary() -> None:
     circuit = Circuit(3, 3, name="roundtrip")
     circuit.add("H", [0])
     circuit.add("RX", [1], [0.75])
-    circuit.add("CNOT", [2], controls=[1])
+    circuit.add("CNOT", [1, 2])
     circuit.add("SWAP", [0, 2])
     circuit.measure(0, 0)
 
@@ -478,19 +527,28 @@ def test_qasm_round_trip_preserves_the_unitary() -> None:
 def test_circuit_document_round_trip() -> None:
     circuit = Circuit(2, 2, name="doc")
     circuit.add("H", [0])
-    circuit.add("CNOT", [1], controls=[0])
-    circuit.measure_all()
+    circuit.add("CNOT", [0, 1])
+    circuit.add("RZ", [1], [0.3])
     again = Circuit.from_dict(circuit.to_dict())
     assert again.name == circuit.name
     assert again.num_clbits == circuit.num_clbits
     assert [op.to_dict()["name"] for op in again.operations] == [op.to_dict()["name"] for op in circuit.operations]
     assert unitary_distance(again.to_unitary(), circuit.to_unitary()) < 1e-12
 
+    # measurements survive the document round trip too
+    measured = Circuit(2, 2, name="doc-measured")
+    measured.add("H", [0])
+    measured.measure_all()
+    restored = Circuit.from_dict(measured.to_dict())
+    assert restored.num_clbits == 2
+    assert sum(1 for op in restored.operations if op.kind == "measure") == 2
+    assert [op.classical_targets for op in restored.operations if op.kind == "measure"] == [[0], [1]]
+
 
 def test_diagram_shows_every_wire_and_gate() -> None:
     circuit = Circuit(3, 3, name="diagram")
     circuit.add("H", [0])
-    circuit.add("CNOT", [2], controls=[0])
+    circuit.add("CNOT", [0, 2])
     circuit.measure_all()
     diagram = circuit.diagram()
     assert "q0" in diagram and "q2" in diagram
@@ -504,5 +562,9 @@ def test_unknown_gate_and_out_of_range_qubit_are_rejected() -> None:
         circuit.add("NOT_A_GATE", [0])
     with pytest.raises((IndexError, ValueError)):
         circuit.add("X", [5])
-    with pytest.raises((ValueError, KeyError)):
-        circuit.add("CNOT", [0])  # missing a target
+    # a two-qubit gate needs both of its wires; controls=[0] on top of the CNOT
+    # matrix would be an 8x8 operator on two wires, which the validator refuses
+    with pytest.raises(ValueError):
+        circuit.add("CNOT", [0])
+    with pytest.raises(ValueError):
+        circuit.add("CNOT", [1], controls=[0])
