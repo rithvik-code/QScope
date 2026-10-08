@@ -68,7 +68,7 @@ export function FieldGuide({ slides, modeName, onDismiss }: FieldGuideProps) {
     if (expanded && panelRef.current) {
       panelRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
-  }, [slide, expanded]);
+  }, [expanded]);
 
   if (slides.length === 0 || dismissed.has(modeName)) {
     return null;
@@ -122,8 +122,7 @@ export function FieldGuide({ slides, modeName, onDismiss }: FieldGuideProps) {
                   </div>
                 )}
                 {step.pointer && <p className="mt-1 text-[10px] text-[var(--c-faint)]">{step.pointer}</p>}
-              </div>
-              <IconButton
+              </div>              <IconButton
                 label={`step ${index + 1} hint`}
                 size="sm"
                 variant="ghost"
@@ -132,7 +131,6 @@ export function FieldGuide({ slides, modeName, onDismiss }: FieldGuideProps) {
                     setExpanded(true);
                     return;
                   }
-                  /* reveal extra context inline if you later want it; for now just pulse */
                 }}
                 title="read the longer explanation"
               >

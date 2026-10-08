@@ -44,13 +44,11 @@ export function ExecuteMode({ onNavigate }: { onNavigate: (mode: ModeKey) => voi
   }>;
 
   const shotRecords = result?.shot_records ?? [];
-  const guideRef = useRef<HTMLDivElement | null>(null);
 
   return (
-    <div className="space-y-4">
-      <FieldGuide
-        modeName="Execute"
-        onDismiss={() => {}}
+    <div className="space-y-4">          <FieldGuide
+            modeName="Execute"
+            onDismiss={() => {}}
         slides={[
           {
             heading: "What you are looking at",
@@ -64,7 +62,44 @@ export function ExecuteMode({ onNavigate }: { onNavigate: (mode: ModeKey) => voi
                 title: "Top-right: the result, with provenance baked in",
                 body: "After you press execute, the Result panel shows the mode the run ran under (SIMULATED, NOISY SIMULATION, or REAL HARDWARE), the backend and representation the engine picked, the shot count and seed, and the provenance strip that says exactly what was computed. From there you can trace every gate, or jump to the analyse view.",
                 pointer: "Result caption → mode, backend, shots, seed, noise; Provenance strip",
-                tip: "provable provenance strip
+                tip: "provable provenance strip",
+              },
+              {
+                title: "Right column: read the result three ways",
+                body: "The Outcome distribution panel lets you switch between sampled counts (the histogram you actually measured), the exact Born distribution of the final state, and the full amplitude/phase list. The Phase structure panel gives every amplitude as a phasor and reports entanglement, purity, entropy, and the dominant basis. The Ideal vs noisy panel compares this run to the same circuit run with no error model — both are computed, not assumed.",
+                pointer: "Outcome distribution → counts / exact / amplitudes toggle; Phase structure; Ideal vs noisy",
+                highlight: 3,
+                tip: "ways to read one result",
+              },
+            ],
+          },
+          {
+            heading: "How to actually use this page",
+            steps: [
+              {
+                title: "Run it once to see the shape of the answer",
+                body: "Press execute with the default settings and watch the result appear. Then switch the distribution tab between counts, exact, and amplitudes to see the same final state from three angles. The thin white edge on the counts bars is the exact probability — differences of order √shots are sampling noise, not a bug.",
+                pointer: "execute, then Outcome distribution → toggle the segmented control",
+              },
+              {
+                title: "Turn on noise to see what breaks",
+                body: "Drag the noise strength slider up and run again. The mode label switches to NOISY SIMULATION, a fidelity-vs-ideal and trace-distance appear, and the Ideal vs noisy panel lights up. Noise off is an exact unitary evolution; anything else is a simulation of an imperfect run.",
+                pointer: "Run settings → noise strength; Result → fidelity vs ideal, trace distance, Ideal vs noisy",
+              },
+              {
+                title: "When you want to see every gate, go to Trace",
+                body: "Execute gives you the final state. Select ‘trace every gate’ on the result panel to open the debugger and watch the state evolve step by step — or just navigate to the Trace mode from the rail.",
+                pointer: "Result → trace every gate →, or the rail → Trace",
+              },
+            ],
+          },
+        ]}
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
+        {/* -------------------------------------------------------- controls */}
+        <div className="space-y-3">
+          <Panel title="Run settings" subtitle="These are the exact values recorded with the result." dense>
             <div className="space-y-3">
               <Field label="shots">
                 <div className="space-y-1.5">

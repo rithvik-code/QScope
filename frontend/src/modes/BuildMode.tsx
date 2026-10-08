@@ -126,8 +126,7 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
   return (
     <div className="space-y-4">
       <FieldGuide
-        modeName="Build"
-        onDismiss={() => {}}
+        modeName="Build"            onDismiss={() => {}}
         slides={[
           {
             heading: "What you are looking at",
