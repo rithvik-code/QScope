@@ -15,7 +15,6 @@ import { Button, CodeBlock, Field, Notice, Panel, SectionTitle, Segmented, Slide
 import { Sparkline } from "../components/viz/charts";
 import { AmplitudeBars, BlochSphere, CircuitCanvas, StateDiff } from "../components/viz/quantum";
 import { formatSeconds } from "../lib/format";
-import type { TraceStep } from "../lib/api";
 import { useStore } from "../state/store";
 
 export function TraceMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void }) {
