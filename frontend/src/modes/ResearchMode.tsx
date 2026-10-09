@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from "react";
 import { AnimatedNumber, InView } from "../components/motion";
+import { FieldGuide } from "../components/Guide";
 import type { ModeKey } from "../components/Shell";
 import {
   Button,
@@ -123,6 +124,55 @@ export function ResearchMode({ onNavigate }: { onNavigate: (mode: ModeKey) => vo
   const source = circuit ? { circuit } : null;
   const devices = meta?.hardware ?? [];
   const device = devices.some((entry) => entry.key === deviceChoice) ? deviceChoice : devices[0]?.key ?? "";
+
+      <FieldGuide
+        modeName="Research"
+        slides={[
+          {
+            heading: "What you are looking at",
+            steps: [
+              {
+                title: "The assistant is grounded, not omniscient",
+                body: "The 'Ask the assistant' panel answers from the objects you attach — the circuit, a simulation, a trace, an optimisation, a hardware estimate, or stored runs. It says which objects it received and where each number came from. If no LLM is configured it still answers offline; if one is configured it may only rewrite the wording, and every number in the narrative is checked against the grounded answer.",
+                pointer: "Ask the assistant — question, attached context toggles, ask button; the answer panel — intent, confidence, grounding, citations",
+              },
+              {
+                title: "The report generator re-runs the operation it describes",
+                body: "The Report generator panel builds a report from a real run, not from the screen. Each kind states what it needs — simulation needs the loaded circuit, comparison needs two, experiment needs a sweep run here first. Reports export five formats and are written into the reports directory so they can be rerun and inspected later.",
+                pointer: "Report generator — kind, title, objective, build report; saved reports list",
+              },
+              {
+                title: "Attached context is explicit, so you can see what the answer was built from",
+                body: "The attached context list names every object the server receives with the question. Circuit, simulation, trace, optimisation, hardware estimate, and up to eight stored runs are each individually switchable. That is what lets the answer say 'this came from the simulation you attached' instead of sounding like it knew the circuit already.",
+                pointer: "attached context — the toggles and the stored-runs list",
+                tip: "context switches, not a black box",
+              },
+            ],
+          },
+          {
+            heading: "How to use this page",
+            steps: [
+              {
+                title: "Ask about something you have already produced",
+                body: "The fastest path is to load a circuit in Build, run it in Execute, and then come here with a question and the simulation attached. The suggestion chips open with example questions grounded in the same objects. Do not expect the assistant to invent data: if a number it needs is not attached it will say so.",
+                pointer: "question field and suggestion chips; attached context toggles",
+              },
+              {
+                title: "Build a report when you want a reproducible write-up",
+                body: "Pick a report kind, give it a title and objective, and press build report. The server re-runs the operation behind the report, so the numbers in it match the objects on screen and can be reproduced later. Open 'list saved reports' to find the files on disk — HTML, PDF, JSON, CSV and Markdown.",
+                pointer: "Report generator — kind, title, objective, build report, list saved reports",
+                highlight: 7,
+                tip: "report kinds on this page",
+              },
+              {
+                title: "Use stored runs when a question spans several sweeps",
+                body: "If you have run experiments in the laboratory, attach up to eight of them from history so the assistant can compare across sweeps. Each stored run is identified by its date, name, qubit count and mode, so you can see exactly which ones were attached before you ask.",
+                pointer: "stored runs to quote — the history list; the answer citations table",
+              },
+            ],
+          },
+        ]}
+      />
 
   const currentNoise = () => {
     if (settings.noiseStrength > 0) {

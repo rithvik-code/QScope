@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from "react";
 import { AnimatedNumber, InView } from "../components/motion";
+import { FieldGuide } from "../components/Guide";
 import type { ModeKey } from "../components/Shell";
 import {
   Button,
@@ -60,6 +61,55 @@ export function BenchmarkMode({ onNavigate }: { onNavigate: (mode: ModeKey) => v
   const payload = benchmark;
   const qubits = parseQubits(qubitsText);
   const active = KINDS.find((entry) => entry.value === kind) ?? KINDS[0];
+
+      <FieldGuide
+        modeName="Benchmark"
+        slides={[
+          {
+            heading: "What you are looking at",
+            steps: [
+              {
+                title: "Benchmarks are measured here, not estimated",
+                body: "Every number on this page is a timed run on this machine, with a warm-up discarded and repeated trials collapsed to a median and its spread. Scaling fits, memory tables, and external comparisons are all derived from runs performed here, and extrapolated points are labelled as model output so they never look like measurements.",
+                pointer: "top of the result panels — method line, disclaimer, caveats",
+              },
+              {
+                title: "The six kinds answer different performance questions",
+                body: "Scaling runs timing against qubit count and fits the empirical growth. Engines times the same circuit on the state-vector, density-matrix and trajectory backends. Gate throughput isolates per-gate cost at one register size. Memory compares footprints against the budget the planner will not exceed. External runs a real side-by-side against another simulator if one is installed. Full suite runs the whole observatory in one pass.",
+                pointer: "what to measure — the six kind cards",
+              },
+              {
+                title: "Fitted lines are drawn differently from measured ones on purpose",
+                body: "A measured point is a record; a fitted curve is a model of how runtime grows with size. The chart keeps them visually separate, and the extrapolated table states plainly that nothing in it was executed. The fit gives you an empirical exponent for this machine, not a law of nature.",
+                pointer: "runtime chart — solid vs dashed lines; extrapolated points panel",
+                tip: "fit is a model, not a measurement",
+              },
+            ],
+          },
+          {
+            heading: "How to use this page",
+            steps: [
+              {
+                title: "Pick the question first, then the numbers fall out",
+                body: "Choose one of the six kinds by clicking its card; the hint under 'what to measure' changes to describe what that benchmark answers. Scaling and memory are the two most common starting points — one tells you how cost grows, the other tells you where the budget stops you.",
+                pointer: "what to measure → click a kind card",
+                highlight: 6,
+                tip: "kinds on this page",
+              },
+              {
+                title: "Give the benchmark something concrete to time",
+                body: "Qubit counts are the main axis for scaling, memory and engines; depth matters for throughput. Shots matter when the engine sample — the default is a median of repeated timed runs with warm-up discarded. The request as recorded panel echoes back exactly what was timed, so the numbers can be judged in context.",
+                pointer: "qubit counts, circuit depth, shots, trials, seed; request as recorded",
+              },
+              {
+                title: "Read the caveats before quoting a number",
+                body: "Each payload can ship caveats and notes. A refused point is shown as a refusal with its reason rather than as a zero, and over-budget memory cells are marked rather than silently omitted. The one-line disclaimer near the top is the honest summary: these are wall-clock measurements of a NumPy engine in one process on this machine.",
+                pointer: "result panel — disclaimer, notes, caveats; points table — status and reason",
+              },
+            ],
+          },
+        ]}
+      />
 
   const run = () =>
     void runBenchmark({

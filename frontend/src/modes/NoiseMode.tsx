@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatedNumber, InView } from "../components/motion";
+import { FieldGuide } from "../components/Guide";
 import type { ModeKey } from "../components/Shell";
 import { Button, Field, Notice, Panel, SectionTitle, Select, Slider, StatTile, Tag, WarningList } from "../components/ui";
 import { CompareBars, InspectBars, LineChart } from "../components/viz/charts";
@@ -34,6 +35,55 @@ export function NoiseMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
   const [sweep, setSweep] = useState<SweepPoint[]>([]);
   const [sweeping, setSweeping] = useState(false);
   const [sweepError, setSweepError] = useState("");
+
+      <FieldGuide
+        modeName="Noise"
+        slides={[
+          {
+            heading: "What you are looking at",
+            steps: [
+              {
+                title: "Noise is a model you build here, not a thing that just gets worse",
+                body: "The Error model panel on the left is where you assemble an explicit set of channels, each with its own parameters and scope — after each matching gate, while the qubit waits, or once at the end. The results on the right are labelled NOISY SIMULATION when the model is active, and every degradations curve, table and comparison comes from a run with that model, not from a made-up number.",
+                pointer: "Error model — channels, scope, parameters, readout error, run with this model; Presets — the engine's own constructors",
+              },
+              {
+                title: "The degradation curve is the headline, and each point is a real run",
+                body: "When you sweep strength, the Degradation curve panel plots fidelity, purity and entropy against noise strength, with each point a real run of this circuit at that strength. Fidelity falls and purity drops — that is decoherence, not sampling noise. Sampling noise appears as a difference between sampled and exact distributions, not in fidelity.",
+                pointer: "Degradation curve — the line chart; Sweep table — the tabulated numbers",
+                tip: "one point = one real run",
+              },
+              {
+                title: "The result panels tell you what the model did to this circuit",
+                body: "The Noisy result panel gives fidelity vs ideal, trace distance, purity and entropy, plus the distribution after noise and the ideal-vs-noisy metric bars. The bright edge on the probability bars is the ideal probability, so the distance between the two bars is the error the model introduced — not a modelling assumption.",
+                pointer: "Noisy result — fidelity, trace distance, purity, entropy; distribution after noise; ideal vs noisy metrics",
+              },
+            ],
+          },
+          {
+            heading: "How to use this page",
+            steps: [
+              {
+                title: "Start from a preset if you are not sure which channel to use",
+                body: "The Presets row gives the engine's own channel constructors with sensible parameters — bit flip, phase flip, depolarizing, amplitude damping, phase damping, thermal, readout and uniform gate. Pick one to fill the error model with a single channel, then adjust the slider to taste. The 'what to look for' panel explains what each number means when you are not yet familiar with the vocabulary.",
+                pointer: "Presets — the eight channel buttons; What to look for — the glossary cards",
+                highlight: 8,
+                tip: "presets on this page",
+              },
+              {
+                title: "Add channels deliberately — the engine forces the right representation",
+                body: "A custom channel set forces the density-matrix or trajectory engine, because a state vector cannot represent a mixed state and the engine will not pretend otherwise. You can combine channels, set each one's scope, and tune readout error separately — readout error corrupts the histogram, not the state, which is why it is its own slider.",
+                pointer: "Error model — add channel, scope dropdown, parameter sliders, readout error; the note under the buttons",
+              },
+              {
+                title: "Sweep to see which channel is responsible for the degradation",
+                body: "When you want to know which part of your model is doing the damage, sweep strength and watch the curve. The sweep table gives the same numbers tabulaire so you can quote them in a report. The warning under the buttons is honest: these numbers come from a model you configured, simulated on this machine — they are not measurements of any physical device.",
+                pointer: "sweep strength; Sweep table; the What this view never claims notice",
+              },
+            ],
+          },
+        ]}
+      />
 
   const noiseSpec = useMemo<NoiseSpec>(
     () => ({

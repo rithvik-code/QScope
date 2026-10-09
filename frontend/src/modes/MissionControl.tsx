@@ -8,6 +8,7 @@
 
 import { useMemo } from "react";
 import { HeroBackdrop } from "../components/backgrounds";
+import { FieldGuide } from "../components/Guide";
 import { AnimatedNumber, InView, Spotlight, StaggerItem, TextEffect } from "../components/motion";
 import { MODES, type ModeKey } from "../components/Shell";
 import { Button, Notice, Panel, SectionTitle, StatTile, Tag } from "../components/ui";
@@ -20,6 +21,56 @@ export function MissionControl({ onNavigate }: { onNavigate: (mode: ModeKey) => 
 
   return (
     <div className="space-y-4">
+      {/* ------------------------------------------------------------ welcome guide */}
+      <FieldGuide
+        modeName="Mission Control"
+        slides={[
+          {
+            heading: "What you are looking at",
+            steps: [
+              {
+                title: "This page answers one question: what can I do right now?",
+                body: "Mission Control is the front page. The hero on the left opens the environment — what it is, the six questions it is built to answer, and the three doors in: the circuit IDE, the quantum time machine, and the assistant. The environment panel on the right reads the live state of the running system from the engine, with real numbers from the last run when there is one.",
+                pointer: "hero — title, lede, open buttons, six questions; This environment — version, python, numpy, stored runs, history database, reports directory, assistant status",
+              },
+              {
+                title: "The workflow map is the whole platform as one instrument",
+                body: "The middle band is a navigable map of the stages: Build, Execute, Trace, Analyse, Optimise, and the ones after them. Each card states what that stage does in one line and links straight to it. The point is that each stage uses the output of the previous one — nothing here is a separate toy.",
+                pointer: "The workflow, as one instrument — the mode cards",
+                tip: "one map, every mode",
+              },
+              {
+                title: "The lower panels are the real numbers behind the welcome",
+                body: "Last executed run shows shots, runtime, state memory and fidelity versus ideal from the most recent run, plus the dominant outcomes from the final state. Loaded circuit shows what the next run would use. Ready-made experiments loads algorithms straight into the IDE. Session activity and stored history keep the recent footprint visible.",
+                pointer: "Last executed run; Loaded circuit; Ready-made experiments; Session activity; Stored history",
+              },
+            ],
+          },
+          {
+            heading: "How to use this page",
+            steps: [
+              {
+                title: "Start from the door that matches the question you have",
+                body: "If you are here to compose something, open the circuit IDE. If you want to watch the state evolve gate by gate, open the quantum time machine. If you have data already and want an explanation, ask the assistant. The six questions under the lede are the fastest way to pick: each one maps to a stage deeper in the platform.",
+                pointer: "hero — Open the circuit IDE / Open the quantum time machine / Ask the assistant; the six question bullets",
+                highlight: 6,
+                tip: "three doors on this page",
+              },
+              {
+                title: "Use the workflow map as your table of contents",
+                body: "The card for each mode is a button. Click it to jump straight there. The cards are in workflow order, and each blurb says what that stage takes from the previous one, so the map is also a short explanation of how the pieces fit together.",
+                pointer: "The workflow, as one instrument — the mode cards",
+              },
+              {
+                title: "Use the environment panel to check the session is live",
+                body: "Before you start a longer task, glance at This environment — version, python, numpy and the assistant status tell you what the backend can do right now. Stored runs and the history database path tell you whether earlier work is available to quote. If the last run is empty, the notice tells you to load a circuit in Build and execute it in Execute.",
+                pointer: "This environment; Last executed run — the empty-state notice",
+              },
+            ],
+          },
+        ]}
+      />
+
       {/* ------------------------------------------------------------ hero */}
       <section className="panel relative overflow-hidden p-0">
         <HeroBackdrop className="absolute inset-0" />

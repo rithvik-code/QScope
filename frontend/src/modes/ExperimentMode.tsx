@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatedNumber, InView } from "../components/motion";
+import { FieldGuide } from "../components/Guide";
 import type { ModeKey } from "../components/Shell";
 import {
   Button,
@@ -171,6 +172,55 @@ export function ExperimentMode({ onNavigate }: { onNavigate: (mode: ModeKey) => 
   const [storeRuns, setStoreRuns] = useState(true);
   const [formError, setFormError] = useState("");
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
+      <FieldGuide
+        modeName="Experiment"
+        slides={[
+          {
+            heading: "What you are looking at",
+            steps: [
+              {
+                title: "This is a laboratory, not a chart generator",
+                body: "The Experiment mode designs a sweep, runs every point as a real run recorded with its seed, shot count, engine and error model, and keeps the stored-runs ledger next to the design so 'which run produced this point?' is always answerable. Every point is a run; nothing here is inferred from the chart.",
+                pointer: "sweep tab — design, progress, trend, stored-runs ledger",
+              },
+              {
+                title: "The kind chooses the axes of the sweep",
+                body: "The kind selector picks the question shape: algorithm scaling, noise sweep, engine comparison, optimisation study, shot convergence, parameter sweep, or a custom cartesian sweep. Each kind proposes sensible default axes, and you can override them — the axes are the values that become real runs.",
+                pointer: "kind selector — the seven kinds; axes fields; fixed parameters",
+                tip: "seven sweep shapes",
+              },
+              {
+                title: "The design and the ledger live side by side on purpose",
+                body: "On the left is the design — the stored experiment spec, the runs it produced, and the trend you measured. On the right is the stored-runs ledger — every run the sweep recorded, with a reproduction check next to each one so you can rerun a single point and confirm it still holds.",
+                pointer: "sweep tab — stored experiment spec, runs, trend; history tab — ledger, reproduce, delete",
+              },
+            ],
+          },
+          {
+            heading: "How to use this page",
+            steps: [
+              {
+                title: "Choose a kind, then sanity-check the axes before running",
+                body: "Start from one of the seven kinds; the axes fields pre-fill from the catalogue defaults. Edit them if you want a different range — every value you type becomes a separate run. The fixed parameters field holds the things you do not want swept, like the algorithm or the qubit count, so the sweep only varies what you meant it to vary.",
+                pointer: "kind selector; axes fields; fixed text; shots, seed, max combinations, store runs",
+                highlight: 7,
+                tip: "sweep kinds on this page",
+              },
+              {
+                title: "Run it, or stream it if you want to watch the points land",
+                body: "Press run experiment to execute the whole design as stored runs. If you want to watch it progress point by point, stream it instead — the progress line reports the point currently running. Either way, each point is recorded with its seed and settings so it can be reproduced later.",
+                pointer: "run experiment; stream experiment; progress line",
+              },
+              {
+                title: "Read the trend, then go to the ledger if a point looks odd",
+                body: "The trend panel shows the measured series and the stored experiment spec. If one point looks wrong, switch to the history tab and find that run in the ledger — you can reproduce it on demand or delete it. The limits box says what the comparison can and cannot support, so a surprising point is a thing to investigate, not a reflex to trust or discard.",
+                pointer: "history tab — runs ledger, reproduce, delete; limits box under the trend",
+              },
+            ],
+          },
+        ]}
+      />
+
   const [stream, setStream] = useState<{ close: () => void } | null>(null);
   const streamRef = useRef<{ close: () => void } | null>(null);
 
