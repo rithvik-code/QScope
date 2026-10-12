@@ -19,6 +19,7 @@ be able to lose them:
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import io
 import json
 import os
@@ -601,7 +602,7 @@ def create_app() -> FastAPI:
     @app.post("/api/simulate/batch")
     def simulate_batch(request: BatchSimulateRequest) -> dict[str, Any]:
         noise = resolve_noise(request.noise)
-        runs: list[dict[str, Any]] = []
+        jobs: list[tuple[Circuit, RunOptions, int]] = []
         for source in request.sources:
             circuit = resolve_circuit(source)
             options = RunOptions(
@@ -611,7 +612,39 @@ def create_app() -> FastAPI:
                 seed=request.seed,
                 compare_ideal=not noise.is_ideal(),
             )
-            result = run_circuit(circuit, options)
+            plan = plan_execution(circuit, options)
+            jobs.append((circuit, options, plan.estimated_peak_bytes))
+
+        # Batch items are independent. Run them concurrently only when their
+        # estimated peak working sets fit together inside QScope's memory budget.
+        # Keep each wave in request order so response ordering stays deterministic.
+        worker_limit = max(1, min(len(jobs), os.cpu_count() or 1))
+        memory_limit = memory_budget_bytes()
+        waves: list[list[int]] = []
+        wave: list[int] = []
+        wave_bytes = 0
+        for index, (_, _, peak_bytes) in enumerate(jobs):
+            if wave and (len(wave) >= worker_limit or wave_bytes + peak_bytes > memory_limit):
+                waves.append(wave)
+                wave, wave_bytes = [], 0
+            wave.append(index)
+            wave_bytes += peak_bytes
+        if wave:
+            waves.append(wave)
+
+        results: list[Any] = [None] * len(jobs)
+        for indices in waves:
+            if len(indices) == 1:
+                index = indices[0]
+                results[index] = run_circuit(jobs[index][0], jobs[index][1])
+            else:
+                with ThreadPoolExecutor(max_workers=len(indices), thread_name_prefix="qscope-batch") as pool:
+                    futures = {index: pool.submit(run_circuit, jobs[index][0], jobs[index][1]) for index in indices}
+                    for index in indices:
+                        results[index] = futures[index].result()
+
+        runs: list[dict[str, Any]] = []
+        for (circuit, _, _), result in zip(jobs, results, strict=True):
             runs.append(
                 {
                     "result": result.to_dict(include_state=False),
@@ -631,7 +664,18 @@ def create_app() -> FastAPI:
                     },
                 }
             )
-        return {"runs": runs, "noise": noise.to_dict(), "shots": request.shots, "seed": request.seed}
+        return {
+            "runs": runs,
+            "noise": noise.to_dict(),
+            "shots": request.shots,
+            "seed": request.seed,
+            "parallelism": {
+                "strategy": "memory-bounded independent batch execution",
+                "workers": max((len(group) for group in waves), default=1),
+                "waves": len(waves),
+                "memory_budget_mb": memory_limit / 1e6,
+            },
+        }
 
     # ------------------------------------------------------------- debugging
 

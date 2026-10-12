@@ -207,6 +207,9 @@ def test_batch_simulation_returns_one_summary_per_circuit(client: TestClient) ->
     assert len(payload["runs"]) == 2
     assert all(run["summary"]["name"] for run in payload["runs"])
     assert all(run["result"]["counts"] for run in payload["runs"])
+    assert payload["parallelism"]["workers"] >= 1
+    assert payload["parallelism"]["waves"] >= 1
+    assert payload["parallelism"]["strategy"] == "memory-bounded independent batch execution"
 
 
 # --------------------------------------------------------------------- trace
