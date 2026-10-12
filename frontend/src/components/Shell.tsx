@@ -291,7 +291,7 @@ export function Shell({
   onModeChange: (mode: ModeKey) => void;
   children: ReactNode;
 }) {
-  const { health, meta, result, trace, selection, document: circuit, settings, ask, answer, loading } = useStore();
+  const { health, meta, result, trace, selection, document: circuit, settings, ask, answer, loading, errors, loadAlgorithm } = useStore();
   const [showPalette, setShowPalette] = useState(false);
   const [showAllTools, setShowAllTools] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -317,10 +317,22 @@ export function Shell({
 
   const commands = [
     ...MODES.filter((entry) => entry.key !== "control").map((entry) => ({ label: `Open ${entry.label}`, run: () => onModeChange(entry.key) })),
-    { label: "Create a Bell state", run: () => { void useStore.getState; onModeChange("build"); } },
+    { label: "Create a Bell state", run: () => { void loadAlgorithm("bell_state"); onModeChange("build"); } },
     { label: "Run current circuit", run: () => onModeChange("execute") },
-    { label: "Explain current result", run: () => { setAssistantOpen(true); onModeChange("research"); } },
+    { label: "Explain current result", run: () => { setAssistantOpen(true); } },
   ];
+
+  useEffect(() => {
+    document.documentElement.dataset.detail = detail;
+    try { window.localStorage.setItem("qscope-detail", detail); } catch { /* storage can be unavailable in private contexts */ }
+  }, [detail]);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("qscope-detail");
+      if (saved === "beginner" || saved === "research") setDetail(saved);
+    } catch { /* use beginner mode when storage is unavailable */ }
+  }, []);
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -367,6 +379,11 @@ export function Shell({
             <Button size="sm" variant="outline" onClick={() => setShowAllTools((value) => !value)}>
               {showAllTools ? "simple view" : "all tools"}
             </Button>
+            <Button size="sm" variant="ghost" onClick={() => setDetail((value) => value === "beginner" ? "research" : "beginner")} title="Change explanation detail">
+              {detail === "beginner" ? "Beginner" : "Research detail"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setCommandOpen(true)} title="Open command bar (Ctrl+K or ⌘K)">Ctrl/⌘K</Button>
+            <Button size="sm" variant="outline" onClick={() => setAssistantOpen((open) => !open)}>Ask QScope</Button>
             <Button size="sm" variant="ghost" onClick={() => setShowPalette((value) => !value)} title="Change appearance">
               <Icon name="palette" size={13} />
             </Button>
@@ -444,6 +461,24 @@ export function Shell({
       </main>
 
       <AnimatePresence>{showPalette && <PaletteStudio onClose={() => setShowPalette(false)} />}</AnimatePresence>
+      <AnimatePresence>
+        {commandOpen && <motion.div className="fixed inset-0 z-50 flex items-start justify-center bg-black/55 px-4 pt-[14vh] backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(event) => { if (event.target === event.currentTarget) setCommandOpen(false); }}>
+          <motion.div initial={{ opacity: 0, y: -12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }} className="w-full max-w-xl rounded-2xl border border-[var(--c-line-strong)] bg-[var(--c-panel)] p-3 shadow-2xl">
+            <input autoFocus value={command} onChange={(event) => setCommand(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setCommandOpen(false); if (event.key === "Enter") { const match = commands.find((item) => item.label.toLowerCase().includes(command.toLowerCase())); if (match) match.run(); else { setAssistantQuestion(command); setAssistantOpen(true); } setCommandOpen(false); } }} placeholder="Search tools or ask QScope…" className="w-full rounded-xl border border-[var(--c-line)] bg-[var(--c-bg)] px-4 py-3 text-sm outline-none focus:border-[var(--c-primary)]" />
+            <div className="mt-2 max-h-[50vh] overflow-y-auto">{commands.filter((item) => item.label.toLowerCase().includes(command.toLowerCase())).map((item) => <button key={item.label} onClick={() => { item.run(); setCommandOpen(false); }} className="block w-full rounded-lg px-3 py-2.5 text-left text-sm text-[var(--c-muted)] hover:bg-[var(--c-panel-2)] hover:text-[var(--c-text)]">{item.label}<span className="float-right text-[var(--c-faint)]">↵</span></button>)}</div>
+            <div className="px-3 pt-2 text-[10px] text-[var(--c-faint)]">Enter opens a matching action or sends your question to Ask QScope · Esc closes</div>
+          </motion.div>
+        </motion.div>}
+      </AnimatePresence>
+      <AnimatePresence>
+        {assistantOpen && <motion.aside initial={{ x: 420, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 420, opacity: 0 }} transition={{ type: "spring", stiffness: 280, damping: 30 }} className="fixed bottom-4 right-4 z-40 flex max-h-[80vh] w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[var(--c-line-strong)] bg-[var(--c-bg)] shadow-2xl">
+          <div className="flex items-center justify-between border-b border-[var(--c-line)] p-4"><div><div className="text-sm font-medium">Ask QScope</div><div className="mt-1 text-[10px] text-[var(--c-faint)]">Answers grounded in the current circuit and run</div></div><button onClick={() => setAssistantOpen(false)} className="rounded-md px-2 py-1 text-[var(--c-muted)] hover:bg-[var(--c-panel)]" aria-label="Close assistant">×</button></div>
+          <div className="flex-1 space-y-3 overflow-y-auto p-4">{answer ? <Panel title={answer.title} subtitle={`${answer.grounding} · ${answer.confidence}`} dense><p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--c-muted)]">{answer.body}</p>{answer.bullets.length > 0 && <ul className="mt-3 list-disc space-y-1 pl-4 text-xs text-[var(--c-muted)]">{answer.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}</Panel> : <p className="text-xs leading-relaxed text-[var(--c-muted)]">Ask about the loaded circuit, the most recent result, or what to try next. QScope will say when it does not have enough evidence.</p>}{!circuit && <p className="text-xs text-[var(--c-faint)]">Load a circuit first for circuit-specific answers.</p>}</div>
+          <form className="border-t border-[var(--c-line)] p-3" onSubmit={(event) => { event.preventDefault(); if (!assistantQuestion.trim()) return; const source = circuit ? { circuit } : undefined; const body: Record<string, unknown> = { question: assistantQuestion, use_llm: false }; if (source) { body.source = source; body.simulate = { source, shots: settings.shots, seed: settings.seed, backend: settings.backend, noise: settings.noise, compare_ideal: true, store: false }; } void ask(body); setAssistantQuestion(""); }}>
+            <div className="flex gap-2"><input value={assistantQuestion} onChange={(event) => setAssistantQuestion(event.target.value)} placeholder="Ask about this experiment…" className="min-w-0 flex-1 rounded-xl border border-[var(--c-line)] bg-[var(--c-panel)] px-3 py-2.5 text-xs outline-none focus:border-[var(--c-primary)]" /><Button variant="primary" disabled={loading.ask || !assistantQuestion.trim()}>{loading.ask ? "…" : "Ask"}</Button></div>{errors.ask && <p className="mt-2 text-xs text-[var(--c-danger)]">{errors.ask}</p>}
+          </form>
+        </motion.aside>}
+      </AnimatePresence>
 
       <footer className="border-t border-[var(--c-line)] px-4 py-3">
         <div className="mx-auto flex w-full max-w-[1680px] items-center justify-between text-[10px] text-[var(--c-faint)]">

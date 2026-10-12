@@ -122,6 +122,18 @@ body {
   background-attachment: fixed;
 }
 
+.research-only {
+  display: none;
+}
+
+html[data-detail="research"] .research-only {
+  display: block;
+}
+
+html[data-detail="research"] .simple-only {
+  display: none;
+}
+
 button,
 a,
 input,
