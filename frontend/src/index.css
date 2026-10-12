@@ -116,6 +116,32 @@ body {
   font-feature-settings: "cv05" 1, "ss01" 1, "tnum" 1;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  background-image:
+    radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--c-primary) 8%, transparent), transparent 34%),
+    radial-gradient(circle at 88% 14%, color-mix(in oklab, var(--c-secondary) 8%, transparent), transparent 30%);
+  background-attachment: fixed;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  transition:
+    color 220ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    opacity 220ms ease,
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px) scale(0.985);
+}
+
+button:not(:disabled):hover {
+  transition-duration: 140ms;
 }
 
 ::selection {
@@ -152,6 +178,7 @@ body {
   border: 1px solid var(--c-line);
   border-radius: 14px;
   backdrop-filter: blur(10px);
+  transition: border-color 260ms ease, box-shadow 260ms ease, background 260ms ease, transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @utility panel-flat {

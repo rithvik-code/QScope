@@ -22,7 +22,7 @@ export const PALETTES: Palette[] = [
     name: "Scientific",
     note: "The default instrument palette: cold neutrals, a cyan signal colour.",
     mode: "dark",
-    colors: { text: "#e9edf5", background: "#080a10", primary: "#6ee7c8", secondary: "#7aa2ff", accent: "#ff8ad4" },
+    colors: { text: "#edf3ff", background: "#090b16", primary: "#63e6c3", secondary: "#9b8cff", accent: "#ff9f8e" },
   },
   {
     name: "Deep Field",
