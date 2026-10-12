@@ -1,0 +1,2 @@
+numpy>=1.24
+# optional GPU backend (needs an NVIDIA GPU): pip install cupy-cuda12x
