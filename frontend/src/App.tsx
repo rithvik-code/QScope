@@ -9,11 +9,11 @@ import { BenchmarkMode } from "./modes/BenchmarkMode";
 import { BuildMode } from "./modes/BuildMode";
 import { ExecuteMode } from "./modes/ExecuteMode";
 import { ExperimentMode } from "./modes/ExperimentMode";
-import { MissionControl } from "./modes/MissionControl";
 import { NoiseMode } from "./modes/NoiseMode";
 import { OptimizeMode } from "./modes/OptimizeMode";
 import { ResearchMode } from "./modes/ResearchMode";
 import { TraceMode } from "./modes/TraceMode";
+import { SimpleHome } from "./components/SimpleHome";
 
 /**
  * A fault in one view must not take the whole instrument down: the engine keeps
@@ -75,7 +75,7 @@ function Workspace() {
       case "research":
         return <ResearchMode onNavigate={setMode} />;
       default:
-        return <MissionControl onNavigate={setMode} />;
+        return <SimpleHome onNavigate={setMode} />;
     }
   }, [mode]);
 

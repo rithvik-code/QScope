@@ -394,7 +394,7 @@ export function Shell({
 
       <main className="relative mx-auto w-full max-w-[1680px] flex-1 px-4 pb-16 pt-4">
         {children}
-        <div className="mt-6 grid gap-3 lg:grid-cols-2">
+        {mode !== "control" && <div className="mt-6 grid gap-3 lg:grid-cols-2">
           <RunLog />
           <Panel title="Data handling" subtitle="What the interface does and does not do with your numbers." dense>
             <ul className="space-y-1.5 text-[11px] leading-relaxed text-[var(--c-muted)]">
@@ -416,7 +416,7 @@ export function Shell({
               </li>
             </ul>
           </Panel>
-        </div>
+        </div>}
       </main>
 
       <AnimatePresence>{showPalette && <PaletteStudio onClose={() => setShowPalette(false)} />}</AnimatePresence>
