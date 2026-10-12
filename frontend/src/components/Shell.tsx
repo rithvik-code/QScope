@@ -8,7 +8,7 @@
  * working rather than after.
  */
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTheme } from "../theme/ThemeProvider";
 import { PALETTES } from "../theme/theme";
@@ -291,12 +291,36 @@ export function Shell({
   onModeChange: (mode: ModeKey) => void;
   children: ReactNode;
 }) {
-  const { health, meta, result, trace, selection, document: circuit } = useStore();
+  const { health, meta, result, trace, selection, document: circuit, settings, ask, answer, loading } = useStore();
   const [showPalette, setShowPalette] = useState(false);
   const [showAllTools, setShowAllTools] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [detail, setDetail] = useState<"beginner" | "research">("beginner");
+  const [command, setCommand] = useState("");
+  const [assistantQuestion, setAssistantQuestion] = useState("");
   const active = MODES.find((entry) => entry.key === mode) ?? MODES[0];
   const simpleModes = MODES.filter((entry) => ["control", "build", "execute", "trace", "research"].includes(entry.key));
   const visibleModes = showAllTools || !simpleModes.some((entry) => entry.key === mode) ? MODES : simpleModes;
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault(); setCommandOpen((open) => !open);
+      } else if (event.key === "/" && !["INPUT", "TEXTAREA"].includes((event.target as HTMLElement)?.tagName)) {
+        event.preventDefault(); setCommandOpen(true);
+      } else if (event.key === "Escape") { setCommandOpen(false); setAssistantOpen(false); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const commands = [
+    ...MODES.filter((entry) => entry.key !== "control").map((entry) => ({ label: `Open ${entry.label}`, run: () => onModeChange(entry.key) })),
+    { label: "Create a Bell state", run: () => { void useStore.getState; onModeChange("build"); } },
+    { label: "Run current circuit", run: () => onModeChange("execute") },
+    { label: "Explain current result", run: () => { setAssistantOpen(true); onModeChange("research"); } },
+  ];
 
   return (
     <div className="relative flex min-h-screen flex-col">
