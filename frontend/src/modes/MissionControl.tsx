@@ -192,7 +192,7 @@ export function MissionControl({ onNavigate }: { onNavigate: (mode: ModeKey) => 
                     type="button"
                     onClick={() => {
                       if (index === 0) void loadAlgorithm("bell_state");
-                      onNavigate(mode);
+                      onNavigate(mode as ModeKey);
                     }}
                     className={`focus-ring rounded-xl border p-3 text-left transition-colors ${
                       current
