@@ -2,6 +2,9 @@
 
 QScope is a **quantum computing research environment**, not a simulator with a run button.
 
+The product direction is documented in [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md): a local-first,
+ChatGPT-like quantum workspace that stays approachable for beginners while preserving research-grade tools.
+
 It runs on a normal laptop, from one command, and it covers the whole loop a person
 actually works in:
 
