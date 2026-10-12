@@ -293,7 +293,10 @@ export function Shell({
 }) {
   const { health, meta, result, trace, selection, document: circuit } = useStore();
   const [showPalette, setShowPalette] = useState(false);
+  const [showAllTools, setShowAllTools] = useState(false);
   const active = MODES.find((entry) => entry.key === mode) ?? MODES[0];
+  const simpleModes = MODES.filter((entry) => ["control", "build", "execute", "trace", "research"].includes(entry.key));
+  const visibleModes = showAllTools || !simpleModes.some((entry) => entry.key === mode) ? MODES : simpleModes;
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -337,16 +340,18 @@ export function Shell({
                 last: {result.mode}
               </Tag>
             )}
-            <Button size="sm" variant="outline" onClick={() => setShowPalette((value) => !value)}>
+            <Button size="sm" variant="outline" onClick={() => setShowAllTools((value) => !value)}>
+              {showAllTools ? "simple view" : "all tools"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowPalette((value) => !value)} title="Change appearance">
               <Icon name="palette" size={13} />
-              palette
             </Button>
           </div>
         </div>
 
         {/* workflow rail */}
         <nav className="mx-auto flex w-full max-w-[1680px] items-center gap-1 overflow-x-auto px-4 pb-2">
-          {MODES.map((entry) => {
+          {visibleModes.map((entry) => {
             const isActive = entry.key === mode;
             return (
               <button
@@ -371,6 +376,15 @@ export function Shell({
               </button>
             );
           })}
+          {!showAllTools && (
+            <button
+              type="button"
+              onClick={() => setShowAllTools(true)}
+              className="focus-ring ml-1 shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] text-[var(--c-faint)] transition-colors hover:text-[var(--c-text)]"
+            >
+              + more tools
+            </button>
+          )}
           <span className="ml-auto hidden shrink-0 pr-1 text-[10px] text-[var(--c-faint)] xl:block">
             {trace ? `trace ready · ${trace.steps.length} steps` : selection.algorithm ? `source: ${selection.algorithm}` : "source: circuit"}
             {meta ? ` · ${meta.algorithms.length} algorithms` : ""}
