@@ -18,6 +18,7 @@ import { useStore } from "../state/store";
 export function MissionControl({ onNavigate }: { onNavigate: (mode: ModeKey) => void }) {
   const { meta, health, log, result, document: circuit, trace, optimization, selection, loadAlgorithm, history } = useStore();
   const distributions = useMemo(() => (result ? sortedProbabilities(result.ideal_probabilities, 6) : []), [result]);
+  const firstExperimentStep = result ? (trace ? 3 : 2) : circuit?.resources?.gates ? 1 : 0;
 
   return (
     <div className="space-y-4">
@@ -167,6 +168,61 @@ export function MissionControl({ onNavigate }: { onNavigate: (mode: ModeKey) => 
           </div>
         </div>
       </section>
+
+      {/* ----------------------------------------------- guided first experiment */}
+      <InView>
+        <Panel
+          title="Your first experiment"
+          subtitle="One circuit, one explainable path through QScope."
+          actions={<Tag colour="var(--c-primary)">guided workflow</Tag>}
+        >
+          <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div className="grid gap-2 sm:grid-cols-4">
+              {[
+                ["Build", "Load Bell state", "build" as ModeKey],
+                ["Execute", "Run the circuit", "execute" as ModeKey],
+                ["Trace", "Watch every gate", "trace" as ModeKey],
+                ["Explain", "Understand the result", "analyze" as ModeKey],
+              ].map(([label, detail, mode], index) => {
+                const complete = index < firstExperimentStep;
+                const current = index === firstExperimentStep;
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      if (index === 0) void loadAlgorithm("bell_state");
+                      onNavigate(mode);
+                    }}
+                    className={`focus-ring rounded-xl border p-3 text-left transition-colors ${
+                      current
+                        ? "border-[var(--c-primary)] bg-[var(--c-primary)]/10"
+                        : complete
+                          ? "border-[var(--c-ok)]/40 bg-[var(--c-ok)]/5"
+                          : "border-[var(--c-border)] bg-[var(--c-panel)] hover:border-[var(--c-primary)]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="label-xs">0{index + 1}</span>
+                      <span className="text-[11px] text-[var(--c-muted)]">{complete ? "done" : current ? "next" : ""}</span>
+                    </div>
+                    <div className="mt-2 text-[13px] font-medium">{label}</div>
+                    <p className="mt-1 text-[11px] leading-snug text-[var(--c-muted)]">{detail}</p>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 lg:max-w-[230px] lg:flex-col lg:items-stretch">
+              <Button variant="primary" onClick={() => { void loadAlgorithm("bell_state"); onNavigate("build"); }}>
+                Start with Bell state
+              </Button>
+              <p className="text-[10px] leading-relaxed text-[var(--c-faint)]">
+                A two-qubit circuit where the trace makes entanglement visible.
+              </p>
+            </div>
+          </div>
+        </Panel>
+      </InView>
 
       {/* --------------------------------------------------- workflow map */}
       <InView>
