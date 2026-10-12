@@ -46,6 +46,8 @@ from qscope.simulator import (
     RunOptions,
     SimulationError,
     memory_budget_bytes,
+    plan_execution,
+    run_batch_jobs,
     run_circuit,
 )
 from qscope.simulator.noise import NoiseModel
@@ -62,6 +64,31 @@ def bell() -> Circuit:
     circuit.add("CNOT", [0, 1])
     circuit.measure_all()
     return circuit
+
+
+def test_batch_scheduler_runs_independent_circuits_concurrently_in_order() -> None:
+    circuits = [bell(), build_algorithm("ghz_state", num_qubits=3).circuit]
+    options = [RunOptions(shots=64, seed=11), RunOptions(shots=64, seed=11)]
+    peaks = [plan_execution(circuit, option).estimated_peak_bytes for circuit, option in zip(circuits, options)]
+    jobs = [(circuit, option, peak) for circuit, option, peak in zip(circuits, options, peaks)]
+
+    results, waves = run_batch_jobs(jobs, sum(peaks), worker_limit=2)
+
+    assert waves == [[0, 1]]
+    assert [result.circuit_name for result in results] == [circuit.name for circuit in circuits]
+    assert results[0].counts == run_circuit(circuits[0], options[0]).counts
+    assert results[1].counts == run_circuit(circuits[1], options[1]).counts
+
+
+def test_batch_scheduler_respects_shared_memory_budget() -> None:
+    circuits = [bell(), build_algorithm("ghz_state", num_qubits=3).circuit]
+    options = [RunOptions(shots=32, seed=3), RunOptions(shots=32, seed=3)]
+    peaks = [plan_execution(circuit, option).estimated_peak_bytes for circuit, option in zip(circuits, options)]
+    jobs = [(circuit, option, peak) for circuit, option, peak in zip(circuits, options, peaks)]
+
+    _, waves = run_batch_jobs(jobs, max(peaks), worker_limit=2)
+
+    assert waves == [[0], [1]]
 
 
 # ---------------------------------------------------------------- simulator

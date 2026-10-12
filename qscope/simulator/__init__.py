@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from qscope.simulator.batch import run_batch_jobs
 from qscope.simulator.execution import (
     BACKENDS,
     MEMORY_BUDGET_ENV,
@@ -61,6 +62,7 @@ __all__ = [
     "noise_model_catalog",
     "plan_execution",
     "run_circuit",
+    "run_batch_jobs",
     "run_unitary",
     "safe_max_qubits",
     "scaling_table",
