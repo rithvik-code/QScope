@@ -15,6 +15,7 @@ import { PALETTES } from "../theme/theme";
 import { useStore } from "../state/store";
 import { Button, Panel, Segmented, Tag } from "./ui";
 import { PulseDot } from "./motion";
+import type { AIAnswer } from "../lib/api";
 
 export type ModeKey =
   | "control"
@@ -301,6 +302,7 @@ export function Shell({
   const [detail, setDetail] = useState<"beginner" | "research">("beginner");
   const [command, setCommand] = useState("");
   const [assistantQuestion, setAssistantQuestion] = useState("");
+  const [chat, setChat] = useState<Array<{ role: "user" | "assistant"; text: string; answer?: AIAnswer }>>([]);
   const active = MODES.find((entry) => entry.key === mode) ?? MODES[0];
   const simpleModes = MODES.filter((entry) => ["control", "build", "execute", "trace", "history", "research"].includes(entry.key));
   const visibleModes = showAllTools || !simpleModes.some((entry) => entry.key === mode) ? MODES : simpleModes;
@@ -316,6 +318,15 @@ export function Shell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (!answer) return;
+    setChat((messages) => {
+      const last = messages[messages.length - 1];
+      if (last?.role === "assistant" && last.answer?.question === answer.question) return messages;
+      return [...messages, { role: "assistant", text: answer.body, answer }];
+    });
+  }, [answer]);
 
   const commands = [
     ...MODES.filter((entry) => entry.key !== "control").map((entry) => ({ label: `Open ${entry.label}`, run: () => onModeChange(entry.key) })),
@@ -474,9 +485,9 @@ export function Shell({
       </AnimatePresence>
       <AnimatePresence>
         {assistantOpen && <motion.aside initial={{ x: 420, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 420, opacity: 0 }} transition={{ type: "spring", stiffness: 280, damping: 30 }} className="fixed bottom-4 right-4 z-40 flex max-h-[80vh] w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[var(--c-line-strong)] bg-[var(--c-bg)] shadow-2xl">
-          <div className="flex items-center justify-between border-b border-[var(--c-line)] p-4"><div><div className="text-sm font-medium">Ask QScope</div><div className="mt-1 text-[10px] text-[var(--c-faint)]">Answers grounded in the current circuit and run</div></div><button onClick={() => setAssistantOpen(false)} className="rounded-md px-2 py-1 text-[var(--c-muted)] hover:bg-[var(--c-panel)]" aria-label="Close assistant">×</button></div>
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">{answer ? <Panel title={answer.title} subtitle={`${answer.grounding} · ${answer.confidence}`} dense><p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--c-muted)]">{answer.body}</p>{answer.bullets.length > 0 && <ul className="mt-3 list-disc space-y-1 pl-4 text-xs text-[var(--c-muted)]">{answer.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul>}</Panel> : <p className="text-xs leading-relaxed text-[var(--c-muted)]">Ask about the loaded circuit, the most recent result, or what to try next. QScope will say when it does not have enough evidence.</p>}{!circuit && <p className="text-xs text-[var(--c-faint)]">Load a circuit first for circuit-specific answers.</p>}</div>
-          <form className="border-t border-[var(--c-line)] p-3" onSubmit={(event) => { event.preventDefault(); if (!assistantQuestion.trim()) return; const source = circuit ? { circuit } : undefined; const body: Record<string, unknown> = { question: assistantQuestion, use_llm: false }; if (source) { body.source = source; body.simulate = { source, shots: settings.shots, seed: settings.seed, backend: settings.backend, noise: settings.noise, compare_ideal: true, store: false }; } void ask(body); setAssistantQuestion(""); }}>
+          <div className="flex items-center justify-between border-b border-[var(--c-line)] p-4"><div><div className="text-sm font-medium">Ask QScope</div><div className="mt-1 text-[10px] text-[var(--c-faint)]">A local chat for your circuit, ideas, and questions</div></div><button onClick={() => setAssistantOpen(false)} className="rounded-md px-2 py-1 text-[var(--c-muted)] hover:bg-[var(--c-panel)]" aria-label="Close assistant">×</button></div>
+          <div className="flex-1 space-y-3 overflow-y-auto p-4">{chat.length === 0 && <div className="space-y-3"><p className="text-xs leading-relaxed text-[var(--c-muted)]">Hi — I’m QScope. Ask about this experiment, quantum computing, or what to try next.</p><div className="flex flex-wrap gap-1.5">{["Explain this circuit simply", "What should I try next?", "What is entanglement?"].map((prompt) => <button key={prompt} type="button" onClick={() => setAssistantQuestion(prompt)} className="rounded-full border border-[var(--c-line)] px-2.5 py-1.5 text-[10px] text-[var(--c-muted)] hover:border-[var(--c-primary)]">{prompt}</button>)}</div></div>}{chat.map((message, index) => message.role === "user" ? <div key={`${message.role}-${index}`} className="ml-8 rounded-2xl rounded-br-sm bg-[var(--c-primary)] px-3 py-2.5 text-xs text-[var(--c-bg)]">{message.text}</div> : <div key={`${message.role}-${index}`} className="mr-4 rounded-2xl rounded-bl-sm border border-[var(--c-line)] bg-[var(--c-panel)] p-3"><div className="mb-1 text-[10px] text-[var(--c-faint)]">{message.answer?.title ?? "QScope"} · {message.answer?.confidence ?? "local"}</div><p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--c-muted)]">{message.text}</p>{message.answer?.bullets?.length ? <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-[var(--c-muted)]">{message.answer.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul> : null}</div>)}{loading.ask && <div className="mr-12 rounded-2xl border border-[var(--c-line)] bg-[var(--c-panel)] px-3 py-2 text-xs text-[var(--c-faint)]">Thinking locally…</div>}{!circuit && chat.length > 0 && <p className="text-[10px] text-[var(--c-faint)]">Load a circuit when you want circuit-specific answers.</p>}</div>
+          <form className="border-t border-[var(--c-line)] p-3" onSubmit={(event) => { event.preventDefault(); const question = assistantQuestion.trim(); if (!question) return; setChat((messages) => [...messages, { role: "user", text: question }]); const source = circuit ? { circuit } : undefined; const body: Record<string, unknown> = { question, use_llm: Boolean(health?.llm_configured) }; if (source) { body.source = source; body.simulate = { source, shots: settings.shots, seed: settings.seed, backend: settings.backend, noise: settings.noise, compare_ideal: true, store: false }; } void ask(body); setAssistantQuestion(""); }}>
             <div className="flex gap-2"><input value={assistantQuestion} onChange={(event) => setAssistantQuestion(event.target.value)} placeholder="Ask about this experiment…" className="min-w-0 flex-1 rounded-xl border border-[var(--c-line)] bg-[var(--c-panel)] px-3 py-2.5 text-xs outline-none focus:border-[var(--c-primary)]" /><Button variant="primary" disabled={loading.ask || !assistantQuestion.trim()}>{loading.ask ? "…" : "Ask"}</Button></div>{errors.ask && <p className="mt-2 text-xs text-[var(--c-danger)]">{errors.ask}</p>}
           </form>
         </motion.aside>}
