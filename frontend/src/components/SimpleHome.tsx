@@ -4,6 +4,7 @@ import { Button, Panel, Tag } from "./ui";
 import { useStore } from "../state/store";
 import { CircuitCanvas, PhaseDial, type Amplitude } from "./viz/quantum";
 import { sortedProbabilities } from "../lib/format";
+import { api } from "../lib/api";
 
 const starters = [
   { key: "bell_state", title: "See entanglement", detail: "Build a Bell state and watch two qubits become connected.", colour: "var(--c-primary)" },
@@ -12,7 +13,7 @@ const starters = [
 ];
 
 export function SimpleHome({ onNavigate }: { onNavigate: (mode: ModeKey) => void }) {
-  const { health, document: circuit, result, trace, settings, answer, loading, ask: askAssistant, loadAlgorithm } = useStore();
+  const { health, document: circuit, result, trace, settings, answer, loading, ask: askAssistant, loadAlgorithm, history, setSource, runPanic, note } = useStore();
   const [question, setQuestion] = useState("");
   const amplitudes = result?.statevector?.amplitudes as unknown as Amplitude[] | undefined;
 
@@ -91,6 +92,37 @@ export function SimpleHome({ onNavigate }: { onNavigate: (mode: ModeKey) => void
             </button>
           ))}
         </div>
+      </section>
+
+      <section>
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div><div className="label-xs">Pick up where you left off</div><h2 className="mt-1 text-xl font-medium">Recent builds</h2></div>
+          <Button variant="ghost" onClick={() => onNavigate("history")}>Open full history →</Button>
+        </div>
+        {history.length ? (
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {history.slice(0, 4).map((entry) => (
+              <button
+                key={entry.experiment_id}
+                type="button"
+                onClick={() => void runPanic("restore build", async () => {
+                  const saved = await api.historyGet(entry.experiment_id);
+                  if (!saved.circuit) throw new Error("This saved run does not include a circuit snapshot.");
+                  await setSource({ circuit: saved.circuit });
+                  note("restore build", `${saved.circuit_name} · ${saved.num_qubits} qubits`);
+                  onNavigate("build");
+                })}
+                className="focus-ring panel-flat p-3 text-left transition-colors hover:border-[var(--c-primary)]"
+              >
+                <div className="truncate text-sm font-medium">{entry.name || entry.circuit_name}</div>
+                <div className="mt-1 text-[10px] text-[var(--c-muted)]">{entry.num_qubits} qubits · {entry.gate_count} gates · {entry.shots.toLocaleString()} shots</div>
+                <div className="mt-2 text-[10px] text-[var(--c-primary)]">Restore this circuit →</div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--c-line-strong)] p-4 text-xs text-[var(--c-muted)]">Your saved runs will appear here. Run a circuit with history enabled to keep a restorable snapshot.</div>
+        )}
       </section>
 
       <section className="grid gap-3 md:grid-cols-3">

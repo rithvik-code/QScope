@@ -29,6 +29,8 @@ export function ExecuteMode({ onNavigate }: { onNavigate: (mode: ModeKey) => voi
     simulate,
     planRun,
     traceCircuit,
+    ask,
+    experimentId,
   } = useStore();
   const [selectedBasis, setSelectedBasis] = useState<string | null>(null);
   const [distribution, setDistribution] = useState<"counts" | "ideal" | "state">("counts");
@@ -223,6 +225,27 @@ export function ExecuteMode({ onNavigate }: { onNavigate: (mode: ModeKey) => voi
                 subtitle={`${result.backend} · ${result.shots.toLocaleString()} shots · seed ${result.seed}${result.noise.name ? ` · ${result.noise.name}` : ""}`}
                 actions={
                   <>
+                    <Button size="sm" variant="primary" onClick={() => {
+                      const source = circuit ? { circuit } : undefined;
+                      const body: Record<string, unknown> = {
+                        question: "Explain this run in plain language. What does the result show, and what should I notice?",
+                        use_llm: false,
+                      };
+                      if (source) body.source = source;
+                      if (experimentId) body.experiment_ids = [experimentId];
+                      else if (source) body.simulate = {
+                        source,
+                        shots: result.shots,
+                        seed: result.seed,
+                        backend: settings.backend,
+                        noise: settings.noise,
+                        compare_ideal: true,
+                        store: false,
+                      };
+                      void ask(body).then(() => onNavigate("research"));
+                    }}>
+                      explain this run →
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => void traceCircuit(null)}>
                       trace every gate →
                     </Button>
