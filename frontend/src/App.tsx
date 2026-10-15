@@ -70,6 +70,8 @@ function Workspace() {
         return <NoiseMode onNavigate={setMode} />;
       case "experiment":
         return <ExperimentMode onNavigate={setMode} />;
+      case "history":
+        return <ExperimentMode onNavigate={setMode} initialTab="history" />;
       case "benchmark":
         return <BenchmarkMode onNavigate={setMode} />;
       case "research":

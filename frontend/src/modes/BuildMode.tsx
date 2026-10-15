@@ -67,6 +67,13 @@ const PRESETS: Array<{ key: string; label: string }> = [
   { key: "teleport", label: "Teleportation" },
 ];
 
+const GUIDED_TEMPLATES = [
+  { key: "bell_state", title: "Bell pair", note: "Your first entangled pair", description: "A Hadamard and a controlled-X create correlations that cannot be explained as two independent qubits.", qubits: "2 qubits · 2 gates" },
+  { key: "ghz_state", title: "GHZ state", note: "Entanglement across a register", description: "Extend the Bell-state idea to several qubits and explore how shared correlations scale.", qubits: "3 qubits · multi-qubit" },
+  { key: "grover", title: "Grover search", note: "Amplitude amplification", description: "See how repeated reflections raise the probability of a marked answer.", qubits: "small search register" },
+  { key: "teleportation", title: "Teleportation", note: "A quantum protocol", description: "Follow entanglement, measurement, and classical feed-forward in a complete protocol.", qubits: "3 qubits · measurements" },
+];
+
 export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void }) {
   const { meta, document: circuit, selection, loading, errors, loadAlgorithm, loadQasm, resetCircuit, editCircuit, setQubitCount, setSource, planRun, runPanic, note } =
     useStore();
@@ -75,6 +82,7 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
   const [qubits, setQubits] = useState(3);
   const [qasmInput, setQasmInput] = useState("");
   const [pendingGate, setPendingGate] = useState<string | null>(null);
+  const [activeTemplate, setActiveTemplate] = useState(GUIDED_TEMPLATES[0]);
 
   const selectedOperation = useMemo(
     () => (circuit && selected !== null ? circuit.operations[selected] ?? null : null),
@@ -168,7 +176,7 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
         ]}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[300px_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_250px]">
         {/* -------------------------------------------------- gate palette */}
         <div className="space-y-3">
           <Panel title="Sources" subtitle="Start from an algorithm, a template, QASM or an empty register." dense>
@@ -486,6 +494,47 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
             </div>
           </div>
         </div>
+
+        {/* ----------------------------------------------- guided templates */}
+        <aside className="space-y-3 xl:sticky xl:top-28 xl:self-start">
+          <Panel title="Start from a template" subtitle="Choose a goal; the details stay attached." dense>
+            <div className="space-y-1.5">
+              {GUIDED_TEMPLATES.map((template) => (
+                <button
+                  key={template.key}
+                  type="button"
+                  onClick={() => setActiveTemplate(template)}
+                  className={`focus-ring w-full rounded-lg border px-2.5 py-2 text-left transition-colors ${activeTemplate.key === template.key ? "border-[var(--c-primary)] bg-[color-mix(in_oklab,var(--c-primary)_9%,transparent)]" : "border-[var(--c-line)] hover:border-[var(--c-line-strong)]"}`}
+                  aria-pressed={activeTemplate.key === template.key}
+                >
+                  <span className="block text-xs font-medium">{template.title}</span>
+                  <span className="mt-0.5 block text-[10px] text-[var(--c-muted)]">{template.note}</span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 rounded-lg bg-[var(--c-panel-2)] p-3">
+              <div className="label-xs">{activeTemplate.qubits}</div>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--c-muted)]">{activeTemplate.description}</p>
+              <Button
+                className="mt-3 w-full"
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  void loadAlgorithm(activeTemplate.key, activeTemplate.key === "ghz_state" ? { num_qubits: qubits } : {});
+                }}
+              >
+                Use this template →
+              </Button>
+            </div>
+            <p className="mt-2 text-[10px] leading-relaxed text-[var(--c-faint)]">Templates replace the current circuit. Your saved runs remain in History.</p>
+          </Panel>
+          <Panel title="What next?" dense>
+            <div className="space-y-2 text-[11px] text-[var(--c-muted)]">
+              <button type="button" className="block text-left hover:text-[var(--c-primary)]" onClick={() => onNavigate("execute")}>① Run it and see the outcome →</button>
+              <button type="button" className="block text-left hover:text-[var(--c-primary)]" onClick={() => onNavigate("trace")}>② Trace how each gate changes the state →</button>
+            </div>
+          </Panel>
+        </aside>
       </div>
 
       {selection.qasm && (

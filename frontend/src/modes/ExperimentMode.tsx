@@ -140,7 +140,7 @@ function fixedFor(kind: Kind, defaults: Record<string, unknown>): string {
   return "";
 }
 
-export function ExperimentMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void }) {
+export function ExperimentMode({ onNavigate, initialTab = "sweep" }: { onNavigate: (mode: ModeKey) => void; initialTab?: "sweep" | "history" }) {
   const {
     meta,
     settings,
@@ -159,7 +159,7 @@ export function ExperimentMode({ onNavigate }: { onNavigate: (mode: ModeKey) => 
     reproduce,
   } = useStore();
 
-  const [tab, setTab] = useState<"sweep" | "history">("sweep");
+  const [tab, setTab] = useState<"sweep" | "history">(initialTab);
   const [catalogKey, setCatalogKey] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<Kind>("algorithm_scaling");

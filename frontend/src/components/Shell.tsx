@@ -25,6 +25,7 @@ export type ModeKey =
   | "optimize"
   | "noise"
   | "experiment"
+  | "history"
   | "benchmark"
   | "research";
 
@@ -37,6 +38,7 @@ export const MODES: Array<{ key: ModeKey; label: string; stage: string; blurb: s
   { key: "optimize", label: "Optimize", stage: "05", blurb: "Verified rewrites, circuit evolution, hardware mapping.", icon: "wand" },
   { key: "noise", label: "Noise", stage: "06", blurb: "Error models, fidelity degradation and device estimates.", icon: "wave" },
   { key: "experiment", label: "Experiment", stage: "07", blurb: "Sweeps, reproducibility and stored history.", icon: "flask" },
+  { key: "history", label: "History", stage: "07A", blurb: "Return to earlier circuits and reproduce saved runs.", icon: "log" },
   { key: "benchmark", label: "Benchmark", stage: "08", blurb: "Measured runtime, memory and scaling.", icon: "gauge" },
   { key: "research", label: "Research", stage: "09", blurb: "The grounded assistant and report generator.", icon: "book" },
 ];
@@ -300,7 +302,7 @@ export function Shell({
   const [command, setCommand] = useState("");
   const [assistantQuestion, setAssistantQuestion] = useState("");
   const active = MODES.find((entry) => entry.key === mode) ?? MODES[0];
-  const simpleModes = MODES.filter((entry) => ["control", "build", "execute", "trace", "research"].includes(entry.key));
+  const simpleModes = MODES.filter((entry) => ["control", "build", "execute", "trace", "history", "research"].includes(entry.key));
   const visibleModes = showAllTools || !simpleModes.some((entry) => entry.key === mode) ? MODES : simpleModes;
 
   useEffect(() => {
