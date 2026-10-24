@@ -116,6 +116,8 @@ The test suite completed successfully. The batch scheduler’s tests confirmed t
 
 ### B. Runtime and state-array memory
 
+**TABLE I. LOCAL STATE-VECTOR SCALING MEASUREMENTS**
+
 | Qubits | Gates | Depth | Median time (ms) | Trial spread (ms) | State array (MB) |
 |---:|---:|---:|---:|---:|---:|
 | 6 | 87 | 19 | 6.69 | 3.23 | 0.001024 |
