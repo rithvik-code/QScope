@@ -113,8 +113,8 @@ def main() -> None:
     source_lines = SOURCE.read_text(encoding="utf-8").splitlines()
     title = source_lines[0].removeprefix("# ").strip()
     author_line = source_lines[2].strip().removeprefix("**").removesuffix("**")
-    affiliation = source_lines[3].strip()
-    email = source_lines[4].strip()
+    affiliation = source_lines[3].replace("**", "").strip()
+    email = source_lines[4].replace("**", "").strip()
 
     document = Document()
     document.core_properties.title = title
@@ -203,7 +203,7 @@ def main() -> None:
             table_lines: list[list[str]] = []
             while index < len(body_lines) and body_lines[index].strip().startswith("|"):
                 row = [cell.strip() for cell in body_lines[index].strip().strip("|").split("|")]
-                if not all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in row):
+                if not all(re.fullmatch(r":?-+:?", cell.replace(" ", "")) for cell in row):
                     table_lines.append(row)
                 index += 1
             table_counter += 1

@@ -41,6 +41,18 @@ Graphical and learning-oriented systems are also prior art. Psitrum provides a l
 
 QScope’s differentiating design choice is to make **resource planning, execution provenance, tracing, verified optimization, and memory-bounded batch behavior** part of one local workflow. This is a system-level distinction, not a claim that each feature is unique in isolation. Unlike high-performance simulator projects, QScope prioritizes a coherent inspectable workflow over distributed, GPU, or hardware-provider execution. Unlike a circuit-only visualizer, it also includes experiment, benchmark, and result-history services.
 
+**TABLE I. QUALITATIVE POSITIONING AGAINST SELECTED SOFTWARE PAPERS**
+
+| System | Emphasis reported in cited work | QScope positioning |
+|:--|:--|:--|
+| ProjectQ [3] | Programmable framework, compiler, simulator, and extensible backends | QScope centers on a local GUI workflow and execution provenance rather than compiler extensibility |
+| QuEST [4] | High-performance state-vector and density-matrix simulation with multicore, GPU, and distributed execution | QScope does not target GPU/HPC scale; it emphasizes memory preflight and budgeted independent batches |
+| Qulacs [5] | Fast, flexible research simulator with performance techniques | QScope makes no speed claim; its focus is connecting runs to visual inspection and history |
+| Psitrum [8] | Local simulator with GUI, circuit visualization, noise, and intermediate-state tracing | QScope is a close integrated-workspace precedent; the distinction emphasized here is resource planning, batch policy, run provenance, and verified optimization together |
+| QScope | Local circuit workspace with three simulation representations, planning, traces, analysis, optimization, history, and batch experiments | The evaluated contribution is workflow integration and explicit execution boundaries, not a new simulator algorithm |
+
+The comparison is qualitative and limited to each cited publication’s described emphasis. It is not a feature-complete audit of current software releases, and the table deliberately does not imply that competing tools lack capabilities not mentioned in their cited papers.
+
 ### C. QAOA as an example workload
 
 QScope includes a parameterized QAOA Max-Cut circuit generator that constructs an initial superposition, cost rotations on graph edges, a transverse-field mixer, and terminal measurements [9]. The current implementation is an educational and experimental circuit template; it is not the constraint-preserving WSN cluster-head method described in the supplied sample document. That sample’s CP-QAOA algorithm and reported WSN measurements are not part of QScope and are not used as evidence in this paper.
@@ -116,7 +128,7 @@ The test suite completed successfully. The batch scheduler’s tests confirmed t
 
 ### B. Runtime and state-array memory
 
-**TABLE I. LOCAL STATE-VECTOR SCALING MEASUREMENTS**
+**TABLE II. LOCAL STATE-VECTOR SCALING MEASUREMENTS**
 
 | Qubits | Gates | Depth | Median time (ms) | Trial spread (ms) | State array (MB) |
 |---:|---:|---:|---:|---:|---:|
