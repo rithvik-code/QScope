@@ -17,7 +17,7 @@ from docx.text.paragraph import Paragraph
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "QScope_Research_Paper_Rithvik.docx"
-OUTPUT = ROOT / "QScope_Research_Paper_Rithvik_Illustrated_v2.docx"
+OUTPUT = ROOT / "QScope_Research_Paper_Rithvik_Illustrated_v3.docx"
 FIGURE_DIR = ROOT / "docs" / "research_figures"
 W, H = 1800, 1120
 
@@ -138,6 +138,9 @@ def fig_workspace() -> bytes:
     d.ellipse((621, 842, 638, 859), fill="#B9AEFF")
     d.ellipse((621, 910, 638, 927), outline="#B9AEFF", width=4)
     d.line((629, 859, 629, 910), fill="#B9AEFF", width=3)
+    for yy in (827, 897):
+        rounded(d, (765, yy, 820, yy + 50), "#1C2D3C", "#5A7894", 9, 2)
+        d.text((780, yy + 12), "M", font=font(20, "bold"), fill="#BBD0E4")
     d.text((132, 976), "H on q0  →  CNOT(q0, q1)  →  measure", font=font(17), fill="#93A2B5")
 
     rounded(d, (950, 710, 1665, 1015), "#141D2A", "#2D3A4C", 22, 2)
@@ -151,7 +154,7 @@ def fig_workspace() -> bytes:
     d.text((1010, 946), "Create/import", font=font(14), fill="#8596AA")
     d.text((1165, 946), "Simulate locally", font=font(14), fill="#8596AA")
     d.text((1310, 946), "Trace every gate", font=font(14), fill="#8596AA")
-    return save_image(im, "qscope-figure-01-workspace-v2.png")
+    return save_image(im, "qscope-figure-01-workspace-v3.png")
 
 
 def fig_architecture() -> bytes:
@@ -191,16 +194,16 @@ def fig_architecture() -> bytes:
         if i < len(labels) - 1:
             d.line((x + 211, 873, x + 293, 873), fill=TEAL, width=4)
             d.polygon([(x + 293, 873), (x + 280, 864), (x + 280, 882)], fill=TEAL)
-    return save_image(im, "qscope-figure-02-architecture-v2.png")
+    return save_image(im, "qscope-figure-02-architecture-v3.png")
 
 
 def fig_modes() -> bytes:
     im, d, fg, sub = canvas(label="Q S C O P E   /   QUANTUM SIMULATION")
     title(d, "Three representations, three different trade-offs")
     cards = [
-        (78, 226, 610, 966, "STATE VECTOR", "|ψ⟩", BLUE),
-        (634, 226, 1166, 966, "DENSITY MATRIX", "ρ", VIOLET),
-        (1190, 226, 1722, 966, "TRAJECTORIES", "{ |ψₖ⟩ }", TEAL),
+        (78, 226, 610, 966, "STATE VECTOR", "|psi>", BLUE),
+        (634, 226, 1166, 966, "DENSITY MATRIX", "rho", VIOLET),
+        (1190, 226, 1722, 966, "TRAJECTORIES", "{ |psi_k> }", TEAL),
     ]
     for x1, y1, x2, y2, label, symbol, accent in cards:
         rounded(d, (x1, y1, x2, y2), "#FBFCFE", "#D8E2EC", 26, 2)
@@ -219,7 +222,7 @@ def fig_modes() -> bytes:
     d.text((126, 740), "Good for", font=font(17, "bold"), fill=INK)
     paragraph(d, (126, 775), "Ideal pure-state evolution and sampled pure-state trajectories.", font(18), "#43566B", 420, 8)
     rounded(d, (126, 872, 562, 928), "#EAF2FF", None, 14)
-    d.text((147, 889), "MEMORY   O(2ⁿ) complex amplitudes", font=font(17, "semibold"), fill="#376BC2")
+    d.text((147, 889), "MEMORY   O(2^n) complex amplitudes", font=font(17, "semibold"), fill="#376BC2")
     # Density matrix heatmap
     mx, my, size, cells = 694, 407, 31, 12
     for r in range(cells):
@@ -229,10 +232,10 @@ def fig_modes() -> bytes:
             color = (min(255, 226 - alpha // 3), min(255, 224 - alpha // 2), min(255, 247 - alpha // 2))
             d.rectangle((mx + c * size, my + r * size, mx + (c + 1) * size - 3, my + (r + 1) * size - 3), fill=color)
     d.text((694, 790), "Rows × columns encode coherences", font=font(17), fill=MUTED)
-    d.text((694, 835), "Good for", font=font(17, "bold"), fill=INK)
-    paragraph(d, (694, 870), "Exact mixed-state evolution for supported noise channels.", font(18), "#43566B", 420, 8)
+    d.text((694, 825), "Good for", font=font(17, "bold"), fill=INK)
+    paragraph(d, (694, 855), "Exact mixed-state evolution with supported noise.", font(18), "#43566B", 420, 8)
     rounded(d, (694, 916, 1134, 958), "#F0EDFF", None, 12)
-    d.text((711, 927), "MEMORY   O(4ⁿ) complex entries", font=font(17, "semibold"), fill="#6552C6")
+    d.text((711, 927), "MEMORY   O(4^n) complex entries", font=font(17, "semibold"), fill="#6552C6")
     # Trajectory branches, each a stochastic pure-state path
     d.text((1230, 407), "Noise channel", font=font(17, "semibold"), fill=MUTED)
     d.ellipse((1260, 458, 1318, 516), fill="#E3F6F2", outline=TEAL, width=3)
@@ -248,9 +251,9 @@ def fig_modes() -> bytes:
     d.text((1230, 740), "Good for", font=font(17, "bold"), fill=INK)
     paragraph(d, (1230, 775), "Approximate noisy evolution when exact density matrices are too costly.", font(18), "#43566B", 425, 8)
     rounded(d, (1230, 872, 1678, 928), "#E7F7F3", None, 14)
-    d.text((1250, 889), "COST   More trajectories improve sampling", font=font(16, "semibold"), fill="#168E78")
+    d.text((1250, 889), "COST   More shots improve sampling", font=font(16, "semibold"), fill="#168E78")
     d.text((80, 1022), "Classical simulation only · output type and approximation are identified per run.", font=font(17, "semibold"), fill=MUTED)
-    return save_image(im, "qscope-figure-03-simulation-modes.png")
+    return save_image(im, "qscope-figure-03-simulation-modes-v3.png")
 
 
 def fig_scheduler() -> bytes:
@@ -285,7 +288,7 @@ def fig_scheduler() -> bytes:
         d.text((1272, y + 46), total, font=font(21, "bold"), fill=INK)
     rounded(d, (105, 1000, 1695, 1060), "#F2F6FA", None, 16)
     d.text((133, 1019), "Results return in original input order  ·  oversized jobs receive the normal planner's refusal  ·  estimates are guardrails, not OS isolation", font=font(15, "semibold"), fill="#51667D")
-    return save_image(im, "qscope-figure-04-parallel-scheduler.png")
+    return save_image(im, "qscope-figure-04-parallel-scheduler-v3.png")
 
 
 def fig_benchmark() -> bytes:
@@ -306,23 +309,19 @@ def fig_benchmark() -> bytes:
     qubits = [6, 8, 10, 12, 14]
     runtimes = [6.69, 16.04, 16.51, 57.64, 229.93]
     spreads = [3.23, 4.02, 2.52, 4.22, 17.93]
-    xs = [x0 + 120 + i * 350 for i in range(5)]
+    xs = [x0 + 120 + i * 300 for i in range(5)]
     points = [(x, ymap(v)) for x, v in zip(xs, runtimes)]
     for (xa, ya), (xb, yb) in zip(points, points[1:]):
         d.line((xa, ya, xb, yb), fill=BLUE, width=7)
     for i, (x, val, spread) in enumerate(zip(xs, runtimes, spreads)):
         yy = ymap(val)
-        yhi, ylo = ymap(val + spread / 2), ymap(max(minv, val - spread / 2))
-        d.line((x, yhi, x, ylo), fill=VIOLET, width=5)
-        d.line((x - 13, yhi, x + 13, yhi), fill=VIOLET, width=4)
-        d.line((x - 13, ylo, x + 13, ylo), fill=VIOLET, width=4)
         d.ellipse((x - 13, yy - 13, x + 13, yy + 13), fill=TEAL, outline=WHITE, width=3)
         d.text((x - 54, yy - 54 if yy - 54 > y0 else yy + 25), f"{val:.2f} ms", font=font(18, "bold"), fill=INK)
         d.text((x - 32, y1 + 22), f"{qubits[i]} qubits", font=font(18, "semibold"), fill=INK)
     d.text((x0 + 680, 912), "Generated 6-layer circuits · 512 shots · 5 measured trials · 1 warm-up", font=font(17, "semibold"), fill="#526A80")
     d.text((x0 + 680, 948), "Windows 11 · Python 3.12.14 · NumPy 2.3.5 · 16 logical CPUs · no GPU", font=font(17), fill=MUTED)
     d.text((x0 + 680, 984), "One machine / one circuit family; descriptive measurements, not a universal limit or speedup claim.", font=font(16), fill=MUTED)
-    return save_image(im, "qscope-figure-05-benchmark.png")
+    return save_image(im, "qscope-figure-05-benchmark-v3.png")
 
 
 def insert_after(paragraph: Paragraph, *, image_bytes: bytes | None = None, caption: str | None = None) -> None:
@@ -334,6 +333,7 @@ def insert_after(paragraph: Paragraph, *, image_bytes: bytes | None = None, capt
         inserted.paragraph_format.space_before = Pt(5)
         inserted.paragraph_format.space_after = Pt(2)
         inserted.paragraph_format.keep_together = True
+        inserted.paragraph_format.keep_with_next = True
         inserted.add_run().add_picture(io.BytesIO(image_bytes), width=Inches(6.6))
     else:
         inserted.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -402,15 +402,15 @@ def main():
     doc = Document(SOURCE)
     clean_manuscript(doc)
     insert_figure(doc, "The central engineering goal is to make execution assumptions visible", 1,
-                  "QScope local workspace overview. The Bell-state circuit is shown loaded but not yet run, matching the live application state.", figures[0])
+                  "Illustrative redraw of the live QScope workspace. The Bell-state circuit is shown loaded but not yet run, matching the application state.", figures[0])
     insert_figure(doc, "The API is hosted locally; no cloud service or quantum-hardware provider is required", 2,
                   "QScope software layers and local experiment loop. Arrows represent the primary request/data flow.", figures[1])
     insert_figure(doc, "not by a claim of universal device-level fidelity", 3,
-                  "Conceptual comparison of the three simulation representations supported by QScope. Memory orders omit temporary arrays and software overhead.", figures[2])
+                  "Conceptual comparison of QScope's three simulation representations. Amplitudes and matrix values are schematic; memory orders omit temporary arrays and overhead.", figures[2])
     insert_figure(doc, "not a hard operating-system isolation boundary", 4,
                   "Illustrative memory-bounded scheduling. Job memory values are abstract units; the scheduler uses per-job peak estimates and the configured shared budget.", figures[3])
     insert_figure(doc, "Across the tested points, the median increased", 5,
-                  "Local median runtime by qubit count. Whiskers show half the reported max–min trial spread; vertical axis is logarithmic.", figures[4])
+                  "Local median runtime by qubit count on a logarithmic axis. Trial max–min spreads are reported in Table II.", figures[4])
     doc.core_properties.title = "QScope: A Local-First, Resource-Aware Quantum Circuit Simulation and Research Workspace"
     doc.core_properties.subject = "Illustrated research manuscript with project-specific diagrams and measured benchmark data"
     doc.save(OUTPUT)
