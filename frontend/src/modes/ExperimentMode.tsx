@@ -160,6 +160,7 @@ export function ExperimentMode({ onNavigate, initialTab = "sweep" }: { onNavigat
   } = useStore();
 
   const [tab, setTab] = useState<"sweep" | "history">(initialTab);
+  useEffect(() => setTab(initialTab), [initialTab]);
   const [catalogKey, setCatalogKey] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<Kind>("algorithm_scaling");

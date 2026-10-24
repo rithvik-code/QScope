@@ -231,17 +231,19 @@ export function ExecuteMode({ onNavigate }: { onNavigate: (mode: ModeKey) => voi
                         question: "Explain this run in plain language. What does the result show, and what should I notice?",
                         use_llm: false,
                       };
-                      if (source) body.source = source;
                       if (experimentId) body.experiment_ids = [experimentId];
-                      else if (source) body.simulate = {
-                        source,
-                        shots: result.shots,
-                        seed: result.seed,
-                        backend: settings.backend,
-                        noise: settings.noise,
-                        compare_ideal: true,
-                        store: false,
-                      };
+                      else if (source) {
+                        body.source = source;
+                        body.simulate = {
+                          source,
+                          shots: result.shots,
+                          seed: result.seed,
+                          backend: settings.backend,
+                          noise: settings.noise,
+                          compare_ideal: true,
+                          store: false,
+                        };
+                      }
                       void ask(body).then(() => onNavigate("research"));
                     }}>
                       explain this run →

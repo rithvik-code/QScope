@@ -260,6 +260,29 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class DraftCreateRequest(_Strict):
+    name: str = Field(min_length=1, max_length=120)
+    circuit: dict[str, Any]
+    favorite: bool = False
+
+
+class DraftUpdateRequest(_Strict):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    circuit: dict[str, Any] | None = None
+    favorite: bool | None = None
+
+
+class ProjectExportRequest(_Strict):
+    name: str = Field(min_length=1, max_length=120)
+    circuit: dict[str, Any]
+    settings: dict[str, Any] = Field(default_factory=dict)
+    last_run: dict[str, Any] | None = None
+
+
+class ProjectImportRequest(_Strict):
+    project: dict[str, Any]
+
+
 class GateDefinition(BaseModel):
     name: str
     num_qubits: int

@@ -44,6 +44,10 @@ from qscope.api.schemas import (
     BenchmarkRequest,
     CircuitSource,
     CompareRequest,
+    DraftCreateRequest,
+    DraftUpdateRequest,
+    DraftCreateRequest,
+    DraftUpdateRequest,
     EvolutionRequest,
     ExperimentRequest,
     HardwareRequest,
@@ -52,6 +56,8 @@ from qscope.api.schemas import (
     NoiseSpec,
     OptimizeRequest,
     PlanRequest,
+    ProjectExportRequest,
+    ProjectImportRequest,
     ReportRequest,
     SimulateRequest,
     TraceRequest,
@@ -94,6 +100,8 @@ from qscope.experiments import (
     what_if,
     what_if_catalog,
 )
+from qscope.experiments.drafts import CircuitDraftStore
+from qscope.experiments.drafts import CircuitDraftStore
 from qscope.hardware import HARDWARE_PRESETS, HardwareModel, hardware_report, preset_catalog
 from qscope.optimizer import opportunities, optimization_levels, optimise
 from qscope.simulator import (
@@ -291,6 +299,22 @@ def store_singleton() -> ExperimentStore:
 
 
 _STORE: ExperimentStore | None = None
+_DRAFT_STORE: CircuitDraftStore | None = None
+
+
+def draft_store_singleton() -> CircuitDraftStore:
+    global _DRAFT_STORE
+    if _DRAFT_STORE is None:
+        _DRAFT_STORE = CircuitDraftStore(DEFAULT_DB)
+    return _DRAFT_STORE
+_DRAFT_STORE: CircuitDraftStore | None = None
+
+
+def draft_store_singleton() -> CircuitDraftStore:
+    global _DRAFT_STORE
+    if _DRAFT_STORE is None:
+        _DRAFT_STORE = CircuitDraftStore(DEFAULT_DB)
+    return _DRAFT_STORE
 
 
 def mode_label(mode: str) -> str:
@@ -547,6 +571,99 @@ def create_app() -> FastAPI:
         if not isinstance(text, str) or not text.strip():
             raise ValueError("body must be {\"qasm\": \"...\"}")
         return circuit_document(from_qasm(text))
+
+    # ----------------------------------------------------------- saved drafts
+
+    @app.get("/api/drafts")
+    def drafts_list() -> dict[str, Any]:
+        drafts = draft_store_singleton().list()
+        return {"drafts": drafts, "total": len(drafts)}
+
+    @app.post("/api/drafts")
+    def drafts_create(request: DraftCreateRequest) -> dict[str, Any]:
+        circuit = resolve_circuit(CircuitSource(circuit=request.circuit))
+        return draft_store_singleton().save(
+            name=request.name.strip(), document=circuit_document(circuit), favorite=request.favorite
+        )
+
+    @app.get("/api/drafts/{draft_id}")
+    def drafts_get(draft_id: str) -> dict[str, Any]:
+        draft = draft_store_singleton().get(draft_id)
+        if draft is None:
+            raise HTTPException(status_code=404, detail={"error": "not-found", "detail": draft_id})
+        return draft
+
+    @app.put("/api/drafts/{draft_id}")
+    def drafts_update(draft_id: str, request: DraftUpdateRequest) -> dict[str, Any]:
+        store = draft_store_singleton()
+        current = store.get(draft_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail={"error": "not-found", "detail": draft_id})
+        fields = request.model_fields_set
+        circuit = resolve_circuit(CircuitSource(circuit=request.circuit)) if request.circuit is not None else None
+        return store.save(
+            draft_id=draft_id,
+            name=request.name.strip() if request.name is not None else current["name"],
+            document=circuit_document(circuit) if circuit is not None else current["document"],
+            favorite=request.favorite if "favorite" in fields and request.favorite is not None else current["favorite"],
+        )
+
+    @app.get("/api/drafts/{draft_id}/versions")
+    def drafts_versions(draft_id: str) -> dict[str, Any]:
+        try:
+            return {"versions": draft_store_singleton().versions(draft_id)}
+        except KeyError:
+            raise HTTPException(status_code=404, detail={"error": "not-found", "detail": draft_id}) from None
+
+    @app.post("/api/drafts/{draft_id}/restore/{version}")
+    def drafts_restore(draft_id: str, version: int) -> dict[str, Any]:
+        try:
+            return draft_store_singleton().restore(draft_id, version)
+        except KeyError:
+            raise HTTPException(status_code=404, detail={"error": "not-found", "detail": f"{draft_id}@{version}"}) from None
+
+    @app.delete("/api/drafts/{draft_id}")
+    def drafts_delete(draft_id: str) -> dict[str, Any]:
+        return {"deleted": draft_store_singleton().delete(draft_id), "draft_id": draft_id}
+
+    # --------------------------------------------------------- project bundle
+
+    @app.post("/api/project/export")
+    def project_export(request: ProjectExportRequest) -> Response:
+        circuit = resolve_circuit(CircuitSource(circuit=request.circuit))
+        safe_settings = {
+            key: value for key, value in request.settings.items()
+            if key in {
+                "shots", "seed", "backend", "noise", "noiseStrength", "traceDepth", "termLimit",
+                "optimizerLevel", "verify", "compareIdeal", "memoryBudgetMb", "store",
+            }
+        }
+        project = {
+            "format": "qscope-project", "schema_version": 1, "name": request.name,
+            "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "circuit": circuit_document(circuit), "settings": safe_settings, "last_run": request.last_run,
+        }
+        filename = safe_filename(request.name, "qscope-project") + ".qscope.json"
+        return Response(
+            content=json.dumps(project, indent=2), media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @app.post("/api/project/import")
+    def project_import(request: ProjectImportRequest) -> dict[str, Any]:
+        project = request.project
+        if project.get("format") != "qscope-project" or project.get("schema_version") != 1:
+            raise HTTPException(status_code=422, detail={"error": "unsupported-project", "detail": "Expected a QScope project bundle with schema version 1."})
+        if not isinstance(project.get("circuit"), dict):
+            raise HTTPException(status_code=422, detail={"error": "invalid-project", "detail": "The bundle has no circuit document."})
+        circuit = resolve_circuit(CircuitSource(circuit=project["circuit"]))
+        settings = project.get("settings") if isinstance(project.get("settings"), dict) else {}
+        allowed = {"shots", "seed", "backend", "noise", "noiseStrength", "traceDepth", "termLimit", "optimizerLevel", "verify", "compareIdeal", "memoryBudgetMb", "store"}
+        return {
+            "name": str(project.get("name") or circuit.name)[:120], "circuit": circuit_document(circuit),
+            "settings": {key: value for key, value in settings.items() if key in allowed},
+            "last_run": project.get("last_run") if isinstance(project.get("last_run"), dict) else None,
+        }
 
     # --------------------------------------------------------------- planning
 
