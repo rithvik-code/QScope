@@ -65,6 +65,26 @@ export interface CircuitDocument {
   metadata: Record<string, unknown>;
 }
 
+export interface CircuitDraft {
+  draft_id: string;
+  name: string;
+  favorite: boolean;
+  created_at: string;
+  updated_at: string;
+  version: number;
+  document?: CircuitDocument;
+}
+
+export interface ProjectBundle {
+  format: "qscope-project";
+  schema_version: number;
+  name: string;
+  exported_at?: string;
+  circuit: CircuitDocument;
+  settings?: Record<string, unknown>;
+  last_run?: Record<string, unknown> | null;
+}
+
 export interface Plan {
   backend: string;
   backend_label: string;
@@ -864,6 +884,18 @@ export const api = {
       verdict: string;
       note: string;
     }>(`/api/history/reproduce/${id}`),
+
+  drafts: () => get<{ drafts: CircuitDraft[]; total: number }>("/api/drafts"),
+  draftGet: (id: string) => get<CircuitDraft>(`/api/drafts/${encodeURIComponent(id)}`),
+  draftCreate: (body: { name: string; circuit: CircuitDocument }) => post<CircuitDraft>("/api/drafts", body),
+  draftUpdate: (id: string, body: { name?: string; circuit?: CircuitDocument; favorite?: boolean }) =>
+    request<CircuitDraft>(`/api/drafts/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(body) }),
+  draftDelete: (id: string) => del<{ deleted: boolean; draft_id: string }>(`/api/drafts/${encodeURIComponent(id)}`),
+  draftVersions: (id: string) => get<{ versions: Array<{ version: number; saved_at: string }> }>(`/api/drafts/${encodeURIComponent(id)}/versions`),
+  draftRestore: (id: string, version: number) => post<CircuitDraft>(`/api/drafts/${encodeURIComponent(id)}/restore/${version}`, {}),
+  projectExport: (body: { name: string; circuit: CircuitDocument; settings: Record<string, unknown>; last_run?: Record<string, unknown> | null }) =>
+    postBlob("/api/project/export", body),
+  projectImport: (project: ProjectBundle) => post<{ name: string; circuit: CircuitDocument; settings: Record<string, unknown>; last_run: Record<string, unknown> | null }>("/api/project/import", { project }),
 };
 
 /** Streams a gate-by-gate trace from the server. */

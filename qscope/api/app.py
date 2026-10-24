@@ -581,6 +581,8 @@ def create_app() -> FastAPI:
 
     @app.post("/api/drafts")
     def drafts_create(request: DraftCreateRequest) -> dict[str, Any]:
+        if not request.name.strip():
+            raise ValueError("draft name cannot be blank")
         circuit = resolve_circuit(CircuitSource(circuit=request.circuit))
         return draft_store_singleton().save(
             name=request.name.strip(), document=circuit_document(circuit), favorite=request.favorite
@@ -599,6 +601,8 @@ def create_app() -> FastAPI:
         current = store.get(draft_id)
         if current is None:
             raise HTTPException(status_code=404, detail={"error": "not-found", "detail": draft_id})
+        if request.name is not None and not request.name.strip():
+            raise ValueError("draft name cannot be blank")
         fields = request.model_fields_set
         circuit = resolve_circuit(CircuitSource(circuit=request.circuit)) if request.circuit is not None else None
         return store.save(
@@ -630,6 +634,8 @@ def create_app() -> FastAPI:
 
     @app.post("/api/project/export")
     def project_export(request: ProjectExportRequest) -> Response:
+        if not request.name.strip():
+            raise ValueError("project name cannot be blank")
         circuit = resolve_circuit(CircuitSource(circuit=request.circuit))
         safe_settings = {
             key: value for key, value in request.settings.items()

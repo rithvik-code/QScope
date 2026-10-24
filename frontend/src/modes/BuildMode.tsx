@@ -7,9 +7,9 @@
  * numbers in the header are the same ones a run will use.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FieldGuide } from "../components/Guide";
-import { api } from "../lib/api";
+import { api, downloadBlob, type CircuitDraft } from "../lib/api";
 import { Button, CodeBlock, Field, IconButton, Notice, NumberInput, Panel, SectionTitle, Segmented, Select, Tag } from "../components/ui";
 import { CircuitCanvas } from "../components/viz/quantum";
 import { useStore } from "../state/store";
@@ -75,7 +75,7 @@ const GUIDED_TEMPLATES = [
 ];
 
 export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void }) {
-  const { meta, document: circuit, selection, loading, errors, loadAlgorithm, loadQasm, resetCircuit, editCircuit, setQubitCount, setSource, planRun, runPanic, note } =
+  const { meta, document: circuit, selection, loading, errors, loadAlgorithm, loadQasm, resetCircuit, editCircuit, setQubitCount, setSource, setSettings, planRun, runPanic, note, undoCircuit, redoCircuit, canUndo, canRedo, settings, result } =
     useStore();
   const [selected, setSelected] = useState<number | null>(null);
   const [view, setView] = useState<"diagram" | "qasm">("diagram");
@@ -83,6 +83,67 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
   const [qasmInput, setQasmInput] = useState("");
   const [pendingGate, setPendingGate] = useState<string | null>(null);
   const [activeTemplate, setActiveTemplate] = useState(GUIDED_TEMPLATES[0]);
+  const [targetWires, setTargetWires] = useState<number[]>([0, 1]);
+  const [drafts, setDrafts] = useState<CircuitDraft[]>([]);
+  const [activeDraft, setActiveDraft] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [versions, setVersions] = useState<Array<{ version: number; saved_at: string }>>([]);
+  const [draggedOperation, setDraggedOperation] = useState<number | null>(null);
+  const projectFile = useRef<HTMLInputElement>(null);
+
+  const refreshDrafts = async () => {
+    const payload = await api.drafts();
+    setDrafts(payload.drafts);
+  };
+
+  useEffect(() => { void refreshDrafts().catch((error) => note("drafts", (error as Error).message, false)); }, []);
+
+  const saveDraft = async () => {
+    if (!circuit) return;
+    const name = draftName.trim() || circuit.name || "Untitled circuit";
+    await runPanic("draft", async () => {
+      const saved = activeDraft
+        ? await api.draftUpdate(activeDraft, { name, circuit })
+        : await api.draftCreate({ name, circuit });
+      setActiveDraft(saved.draft_id);
+      setDraftName(saved.name);
+      await refreshDrafts();
+      note("save draft", `${saved.name} · version ${saved.version}`);
+    });
+  };
+
+  const loadDraft = async (draft: CircuitDraft) => {
+    await runPanic("draft", async () => {
+      const full = await api.draftGet(draft.draft_id);
+      if (!full?.document) throw new Error("This draft has no saved circuit.");
+      await setSource({ circuit: full.document });
+      setActiveDraft(draft.draft_id); setDraftName(draft.name);
+      const revisionList = await api.draftVersions(draft.draft_id); setVersions(revisionList.versions);
+      note("load draft", `${draft.name} · version ${draft.version}`);
+    });
+  };
+
+  const exportProject = async () => {
+    if (!circuit) return;
+    await runPanic("project", async () => {
+      const blob = await api.projectExport({ name: draftName.trim() || circuit.name, circuit, settings: settings as unknown as Record<string, unknown>, last_run: result as unknown as Record<string, unknown> | null });
+      downloadBlob(blob, `${(draftName.trim() || circuit.name).replace(/[^a-z0-9-_]+/gi, "-")}.qscope.json`);
+      note("export project", circuit.name);
+    });
+  };
+
+  const importProject = async (file?: File) => {
+    if (!file) return;
+    await runPanic("project", async () => {
+      const project = JSON.parse(await file.text());
+      const imported = await api.projectImport(project);
+      await setSource({ circuit: imported.circuit });
+      setSettings(imported.settings as Parameters<typeof setSettings>[0]);
+      setDraftName(imported.name); setActiveDraft(null);
+      note("import project", `${imported.name} · ${imported.circuit.num_qubits} qubits`);
+    });
+    if (projectFile.current) projectFile.current.value = "";
+  };
 
   const selectedOperation = useMemo(
     () => (circuit && selected !== null ? circuit.operations[selected] ?? null : null),
@@ -91,26 +152,27 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
 
   const addGate = async (name: string, params: number[] | undefined) => {
     if (!circuit) return;
-    const wires = Array.from({ length: name === "TOFFOLI" ? 3 : 2 }, (_, index) => index).filter((wire) => wire < circuit.num_qubits);
+    const arity = GATE_GROUPS.flatMap((group) => group.gates).find((gate) => gate.name === name)?.arity ?? 1;
+    const selectedValid = targetWires.filter((wire) => wire < circuit.num_qubits);
+    const wires = [...selectedValid, ...Array.from({ length: circuit.num_qubits }, (_, wire) => wire).filter((wire) => !selectedValid.includes(wire))].slice(0, arity);
     if (name === "measure" || name === "reset" || name === "barrier") {
       await editCircuit((operations) => {
         operations.push({
           name,
-          targets: [0],
+          targets: [wires[0] ?? 0],
           params: [],
           controls: [],
-          classical_targets: name === "measure" ? [0] : [],
+          classical_targets: name === "measure" ? [wires[0] ?? 0] : [],
           kind: name === "measure" || name === "reset" || name === "barrier" ? name : "gate",
           label: "",
           opid: `local-${Date.now()}-${operations.length}`,
         } as CircuitOperation);
         return operations;
       });
-      note("edit", `added ${name} on q0`);
+      note("edit", `added ${name} on q${wires[0] ?? 0}`);
 
       return;
     }
-    const arity = GATE_GROUPS.flatMap((group) => group.gates).find((gate) => gate.name === name)?.arity ?? 1;
     if (arity > circuit.num_qubits) {
       note("edit", `${name} needs ${arity} qubits but the circuit has ${circuit.num_qubits}`, false);
       return;
@@ -181,6 +243,11 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
         <div className="space-y-3">
           <Panel title="Sources" subtitle="Start from an algorithm, a template, QASM or an empty register." dense>
             <div className="space-y-2.5">
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => projectFile.current?.click()}>Import project</Button>
+                <Button size="sm" variant="outline" disabled={!circuit} onClick={() => void exportProject()}>Export project</Button>
+                <input ref={projectFile} type="file" accept=".json,.qscope.json,application/json" className="hidden" onChange={(event) => void importProject(event.target.files?.[0])} />
+              </div>
               <Field label="algorithm">
                 <Select
                   value=""
@@ -238,8 +305,9 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
             </div>
           </Panel>
 
-          <Panel title="Gate palette" subtitle="Click a gate to append it to q0…q{n-1}." dense>
+          <Panel title="Gate palette" subtitle="Choose the wire(s), then click a gate." dense>
             <div className="space-y-3">
+              {circuit && <div className="flex flex-wrap items-center gap-1.5"><span className="label-xs mr-1">Wires</span>{Array.from({ length: circuit.num_qubits }, (_, wire) => <button key={wire} type="button" aria-pressed={targetWires.includes(wire)} onClick={() => setTargetWires((current) => current.includes(wire) ? current.filter((item) => item !== wire) : [...current, wire])} className={`rounded-md border px-2 py-1 text-[10px] ${targetWires.includes(wire) ? "border-[var(--c-primary)] text-[var(--c-primary)]" : "border-[var(--c-line)] text-[var(--c-muted)]"}`}>q{wire}</button>)}</div>}
               {GATE_GROUPS.map((group) => (
                 <div key={group.group}>
                   <SectionTitle>{group.group}</SectionTitle>
@@ -327,12 +395,16 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
           </Panel>
 
           <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
-            <Panel title="Operation list" subtitle="Select to edit parameters or reorder." dense>
+            <Panel title="Operation list" subtitle="Drag to reorder, or use the arrows. Undo and redo are available." dense actions={<div className="flex gap-1"><Button size="sm" variant="outline" disabled={!canUndo} onClick={() => void undoCircuit()}>↶ Undo</Button><Button size="sm" variant="outline" disabled={!canRedo} onClick={() => void redoCircuit()}>↷ Redo</Button></div>}>
               <div className="max-h-[300px] space-y-1 overflow-y-auto pr-1">
                 {!circuit?.operations.length && <p className="text-[11px] text-[var(--c-faint)]">No operations yet.</p>}
                 {circuit?.operations.map((operation, index) => (
                   <div
                     key={operation.opid ?? index}
+                    draggable
+                    onDragStart={() => setDraggedOperation(index)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => { if (draggedOperation === null || draggedOperation === index) return; void editCircuit((operations) => { const [item] = operations.splice(draggedOperation, 1); operations.splice(index, 0, item); return operations; }); setDraggedOperation(null); }}
                     className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] transition-colors ${
                       selected === index
                         ? "border-[var(--c-primary)] bg-[color-mix(in_oklab,var(--c-primary)_10%,transparent)]"
@@ -532,6 +604,14 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
             <div className="space-y-2 text-[11px] text-[var(--c-muted)]">
               <button type="button" className="block text-left hover:text-[var(--c-primary)]" onClick={() => onNavigate("execute")}>① Run it and see the outcome →</button>
               <button type="button" className="block text-left hover:text-[var(--c-primary)]" onClick={() => onNavigate("trace")}>② Trace how each gate changes the state →</button>
+            </div>
+          </Panel>
+          <Panel title="Saved drafts" subtitle="Named circuits with recoverable versions." dense>
+            <div className="space-y-2">
+              <input value={draftName} onChange={(event) => setDraftName(event.target.value)} placeholder="Draft name" className="w-full rounded-md border border-[var(--c-line)] bg-[var(--c-panel-2)] px-2.5 py-2 text-xs" aria-label="Draft name" />
+              <Button size="sm" variant="primary" className="w-full" disabled={!circuit} onClick={() => void saveDraft()}>{activeDraft ? "Save changes" : "Save current circuit"}</Button>
+              {drafts.length ? drafts.map((draft) => <div key={draft.draft_id} className="flex items-center gap-1 rounded-lg border border-[var(--c-line)] p-2"><button type="button" onClick={() => void loadDraft(draft)} className="min-w-0 flex-1 text-left"><span className="block truncate text-xs">{draft.favorite ? "★ " : ""}{draft.name}</span><span className="text-[10px] text-[var(--c-faint)]">v{draft.version} · {new Date(draft.updated_at).toLocaleDateString()}</span></button><button type="button" title="Toggle favorite" onClick={() => void api.draftUpdate(draft.draft_id, { favorite: !draft.favorite }).then(refreshDrafts)} className="px-1 text-xs">{draft.favorite ? "★" : "☆"}</button><button type="button" title="Delete draft" onClick={() => { if (window.confirm(`Delete “${draft.name}” and its saved versions?`)) void api.draftDelete(draft.draft_id).then(refreshDrafts); }} className="px-1 text-xs text-[var(--c-muted)]">×</button></div>) : <p className="text-[10px] text-[var(--c-faint)]">Saved circuits will appear here.</p>}
+              {activeDraft && versions.length > 0 && <div className="border-t border-[var(--c-line)] pt-2"><div className="label-xs mb-1">Version history</div>{versions.slice(0, 5).map((entry) => <button key={entry.version} type="button" onClick={() => void runPanic("draft", async () => { const restored = await api.draftRestore(activeDraft, entry.version); if (restored.document) await setSource({ circuit: restored.document }); await refreshDrafts(); setVersions((await api.draftVersions(activeDraft)).versions); note("restore draft version", `v${entry.version}`); })} className="mr-2 mb-1 rounded border border-[var(--c-line)] px-2 py-1 text-[10px]">Restore v{entry.version}</button>)}</div>}
             </div>
           </Panel>
         </aside>

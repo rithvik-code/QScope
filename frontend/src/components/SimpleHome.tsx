@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ModeKey } from "./Shell";
 import { Button, Panel, Tag } from "./ui";
 import { useStore } from "../state/store";
@@ -15,6 +15,20 @@ const starters = [
 export function SimpleHome({ onNavigate }: { onNavigate: (mode: ModeKey) => void }) {
   const { health, document: circuit, result, trace, settings, answer, loading, ask: askAssistant, loadAlgorithm, history, setSource, runPanic, note } = useStore();
   const [question, setQuestion] = useState("");
+  const [guideStep, setGuideStep] = useState(() => Number(localStorage.getItem("qscope-first-run-step") ?? "0"));
+  const [showGuide, setShowGuide] = useState(() => localStorage.getItem("qscope-first-run-hidden") !== "true");
+  const initialRun = useRef(result?.timestamp);
+  const initialTrace = useRef(trace?.total_seconds);
+  useEffect(() => {
+    if (result?.timestamp && result.timestamp !== initialRun.current && guideStep < 2) {
+      initialRun.current = result.timestamp; setGuideStep(2); localStorage.setItem("qscope-first-run-step", "2");
+    }
+  }, [result?.timestamp, guideStep]);
+  useEffect(() => {
+    if (trace && trace.total_seconds !== initialTrace.current && guideStep < 3) {
+      initialTrace.current = trace.total_seconds; setGuideStep(3); localStorage.setItem("qscope-first-run-step", "3");
+    }
+  }, [trace, guideStep]);
   const amplitudes = result?.statevector?.amplitudes as unknown as Amplitude[] | undefined;
 
   const ask = () => {
@@ -70,6 +84,11 @@ export function SimpleHome({ onNavigate }: { onNavigate: (mode: ModeKey) => void
           </div>
         </Panel>
       </section>
+
+      {showGuide && guideStep < 3 && <section className="rounded-2xl border border-[var(--c-primary)]/30 bg-[color-mix(in_oklab,var(--c-primary)_5%,var(--c-panel))] p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="label-xs text-[var(--c-primary)]">Your first quantum experiment · {guideStep}/3</div><h2 className="mt-1 text-lg font-medium">A simple three-step tour</h2><p className="mt-1 text-xs text-[var(--c-muted)]">Build a Bell pair, run it on your laptop, then inspect what each gate did.</p></div><button type="button" onClick={() => { setShowGuide(false); localStorage.setItem("qscope-first-run-hidden", "true"); }} className="text-xs text-[var(--c-faint)]">Dismiss</button></div>
+        <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant={guideStep === 0 ? "primary" : "outline"} onClick={() => { void loadAlgorithm("bell_state"); setGuideStep(1); localStorage.setItem("qscope-first-run-step", "1"); onNavigate("build"); }}>{guideStep > 0 ? "✓ 1. Build Bell pair" : "1. Build Bell pair"}</Button><Button size="sm" variant={guideStep === 1 ? "primary" : "outline"} disabled={guideStep < 1} onClick={() => onNavigate("execute")}>{guideStep > 1 ? "✓ 2. Run it" : "2. Run it →"}</Button><Button size="sm" variant={guideStep === 2 ? "primary" : "outline"} disabled={guideStep < 2} onClick={() => onNavigate("trace")}>3. Trace the gates →</Button></div>
+      </section>}
 
       <section className="grid gap-3 lg:grid-cols-[1.2fr_.8fr]">
         <Panel title="Circuit workspace" subtitle={circuit?.name ?? "Your circuit will appear here."} dense>

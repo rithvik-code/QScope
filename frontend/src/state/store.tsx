@@ -109,6 +109,10 @@ interface StoreValue {
   resetCircuit: (numQubits: number, numClbits?: number) => Promise<void>;
   editCircuit: (mutate: (operations: CircuitOperation[]) => CircuitOperation[], name?: string) => Promise<void>;
   setQubitCount: (count: number) => Promise<void>;
+  undoCircuit: () => Promise<void>;
+  redoCircuit: () => Promise<void>;
+  canUndo: boolean;
+  canRedo: boolean;
   runPanic: (label: string, task: () => Promise<void>) => Promise<void>;
   run: (key: string, task: () => Promise<void>) => Promise<void>;
 
@@ -165,6 +169,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const selectionRef = useRef(selection);
   selectionRef.current = selection;
+  const documentRef = useRef(document);
+  documentRef.current = document;
+  const undoRef = useRef<CircuitDocument[]>([]);
+  const redoRef = useRef<CircuitDocument[]>([]);
+  const [editRevision, setEditRevision] = useState(0);
 
   const note = useCallback((action: string, detail: string, ok = true, seconds?: number) => {
     setLog((entries) => [
@@ -197,6 +206,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setSource = useCallback(
     async (source: CircuitSource) => {
+      undoRef.current = [];
+      redoRef.current = [];
+      setEditRevision((revision) => revision + 1);
       setSelection(source);
       const document = await api.document(source);
       setDocument(document);
@@ -298,6 +310,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             metadata: base.metadata,
           };
           const updated = await api.document({ circuit: payload });
+          undoRef.current = [...undoRef.current.slice(-49), base];
+          redoRef.current = [];
+          setEditRevision((revision) => revision + 1);
           setSelection({ circuit: updated });
           setDocument(updated);
           setPlan(null);
@@ -320,12 +335,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             operations: keep,
           };
           const updated = await api.document({ circuit: payload });
+          undoRef.current = [...undoRef.current.slice(-49), base];
+          redoRef.current = [];
+          setEditRevision((revision) => revision + 1);
           setSelection({ circuit: updated });
           setDocument(updated);
           note(
             "resize register",
             `${base.num_qubits} → ${count} qubits${dropped ? `, ${dropped} operation(s) on removed wires dropped` : ""}`,
           );
+        });
+      },
+      canUndo: undoRef.current.length > 0,
+      canRedo: redoRef.current.length > 0,
+      undoCircuit: async () => {
+        const current = documentRef.current;
+        const previous = undoRef.current.at(-1);
+        if (!current || !previous) return;
+        await runFor("edit", async () => {
+          const updated = await api.document({ circuit: previous });
+          undoRef.current = undoRef.current.slice(0, -1);
+          redoRef.current = [...redoRef.current.slice(-49), current];
+          setEditRevision((revision) => revision + 1);
+          setSelection({ circuit: updated }); setDocument(updated); setPlan(null);
+        });
+      },
+      redoCircuit: async () => {
+        const current = documentRef.current;
+        const next = redoRef.current.at(-1);
+        if (!current || !next) return;
+        await runFor("edit", async () => {
+          const updated = await api.document({ circuit: next });
+          redoRef.current = redoRef.current.slice(0, -1);
+          undoRef.current = [...undoRef.current.slice(-49), current];
+          setEditRevision((revision) => revision + 1);
+          setSelection({ circuit: updated }); setDocument(updated); setPlan(null);
         });
       },
 
@@ -616,6 +660,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     benchmark,
     compareResult,
     document,
+    editRevision,
     errors,
     evolution,
     experiment,
