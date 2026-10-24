@@ -18,15 +18,15 @@ export function SimpleHome({ onNavigate }: { onNavigate: (mode: ModeKey) => void
   const [guideStep, setGuideStep] = useState(() => Number(localStorage.getItem("qscope-first-run-step") ?? "0"));
   const [showGuide, setShowGuide] = useState(() => localStorage.getItem("qscope-first-run-hidden") !== "true");
   const initialRun = useRef(result?.timestamp);
-  const initialTrace = useRef(trace?.total_seconds);
+  const initialTrace = useRef(trace);
   useEffect(() => {
     if (result?.timestamp && result.timestamp !== initialRun.current && guideStep < 2) {
       initialRun.current = result.timestamp; setGuideStep(2); localStorage.setItem("qscope-first-run-step", "2");
     }
   }, [result?.timestamp, guideStep]);
   useEffect(() => {
-    if (trace && trace.total_seconds !== initialTrace.current && guideStep < 3) {
-      initialTrace.current = trace.total_seconds; setGuideStep(3); localStorage.setItem("qscope-first-run-step", "3");
+    if (trace && trace !== initialTrace.current && guideStep < 3) {
+      initialTrace.current = trace; setGuideStep(3); localStorage.setItem("qscope-first-run-step", "3");
     }
   }, [trace, guideStep]);
   const amplitudes = result?.statevector?.amplitudes as unknown as Amplitude[] | undefined;

@@ -283,6 +283,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       loadQasm: async (qasm) => {
         await runFor("load", async () => {
           const loaded = await api.fromQasm(qasm);
+          undoRef.current = [];
+          redoRef.current = [];
+          setEditRevision((revision) => revision + 1);
           setSelection({ circuit: loaded });
           setDocument(loaded);
           note("import QASM", `${loaded.num_qubits} qubits, ${loaded.operations.length} operations`);

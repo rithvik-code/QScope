@@ -107,6 +107,7 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
         : await api.draftCreate({ name, circuit });
       setActiveDraft(saved.draft_id);
       setDraftName(saved.name);
+      setVersions((await api.draftVersions(saved.draft_id)).versions);
       await refreshDrafts();
       note("save draft", `${saved.name} · version ${saved.version}`);
     });
@@ -140,7 +141,7 @@ export function BuildMode({ onNavigate }: { onNavigate: (mode: ModeKey) => void 
       await setSource({ circuit: imported.circuit });
       setSettings(imported.settings as Parameters<typeof setSettings>[0]);
       setDraftName(imported.name); setActiveDraft(null);
-      note("import project", `${imported.name} · ${imported.circuit.num_qubits} qubits`);
+      note("import project", `${imported.name} · ${imported.circuit.num_qubits} qubits${imported.last_run ? " · saved run is in the bundle; rerun for a fresh result" : ""}`);
     });
     if (projectFile.current) projectFile.current.value = "";
   };
