@@ -1,4 +1,4 @@
-"""Render the QScope research-paper Markdown as a two-column IEEE-style DOCX."""
+"""Render the QScope research-paper Markdown as a polished single-column DOCX."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "docs" / "QScope_Research_Paper.md"
-OUTPUT = ROOT / "docs" / "QScope_Research_Paper.docx"
+OUTPUT = ROOT / "docs" / "QScope_Research_Paper_Single_Column.docx"
 FONT = "Times New Roman"
 
 
@@ -24,6 +24,34 @@ def set_cell_shading(cell, fill: str) -> None:
     shading = OxmlElement("w:shd")
     shading.set(qn("w:fill"), fill)
     cell._tc.get_or_add_tcPr().append(shading)
+
+
+def set_cell_margins(cell, *, top: int = 55, start: int = 75, bottom: int = 55, end: int = 75) -> None:
+    tc_pr = cell._tc.get_or_add_tcPr()
+    margins = tc_pr.first_child_found_in("w:tcMar")
+    if margins is None:
+        margins = OxmlElement("w:tcMar")
+        tc_pr.append(margins)
+    for side, value in (("top", top), ("start", start), ("bottom", bottom), ("end", end)):
+        node = margins.find(qn(f"w:{side}"))
+        if node is None:
+            node = OxmlElement(f"w:{side}")
+            margins.append(node)
+        node.set(qn("w:w"), str(value))
+        node.set(qn("w:type"), "dxa")
+
+
+def prevent_row_split(row) -> None:
+    tr_pr = row._tr.get_or_add_trPr()
+    cant_split = OxmlElement("w:cantSplit")
+    tr_pr.append(cant_split)
+
+
+def repeat_table_header(row) -> None:
+    tr_pr = row._tr.get_or_add_trPr()
+    header = OxmlElement("w:tblHeader")
+    header.set(qn("w:val"), "true")
+    tr_pr.append(header)
 
 
 def set_columns(section, count: int) -> None:
@@ -35,6 +63,18 @@ def set_columns(section, count: int) -> None:
         section._sectPr.append(element)
     element.set(qn("w:num"), str(count))
     element.set(qn("w:space"), "360")
+
+
+def configure_section(section, columns: int) -> None:
+    section.page_width = Inches(8.5)
+    section.page_height = Inches(11)
+    section.top_margin = Inches(0.72)
+    section.bottom_margin = Inches(0.72)
+    section.left_margin = Inches(0.68)
+    section.right_margin = Inches(0.68)
+    section.header_distance = Inches(0.32)
+    section.footer_distance = Inches(0.34)
+    set_columns(section, columns)
 
 
 def set_run_font(run, *, size: float | None = None, bold: bool | None = None, italic: bool | None = None) -> None:
@@ -90,20 +130,40 @@ def add_table(document, rows: list[list[str]], table_index: int) -> None:
     table = document.add_table(rows=len(rows), cols=width)
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table.autofit = True
+    table.autofit = False
+    table_pr = table._tbl.tblPr
+    layout = table_pr.find(qn("w:tblLayout"))
+    if layout is None:
+        layout = OxmlElement("w:tblLayout")
+        table_pr.append(layout)
+    layout.set(qn("w:type"), "fixed")
+    table_width = Inches(7.14)
+    widths = ([1.10, 2.65, 3.39] if width == 3 and len(rows) > 3
+              else [1.00, 2.65, 3.49] if width == 3
+              else [0.78, 0.72, 0.76, 1.20, 1.16, 2.52] if width == 6
+              else [table_width / width] * width)
+    repeat_table_header(table.rows[0])
     for r_index, row in enumerate(rows):
+        prevent_row_split(table.rows[r_index])
         for c_index in range(width):
             cell = table.cell(r_index, c_index)
+            cell.width = Inches(widths[c_index])
             cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            set_cell_margins(cell)
             value = row[c_index].strip() if c_index < len(row) else ""
             paragraph = cell.paragraphs[0]
             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER if r_index == 0 else WD_ALIGN_PARAGRAPH.LEFT
+            paragraph.paragraph_format.line_spacing = 1.0
+            paragraph.paragraph_format.keep_together = True
             paragraph.paragraph_format.space_after = Pt(0)
-            add_inline(paragraph, value, size=7.0 if width > 4 else 7.5)
+            add_inline(paragraph, value, size=7.6 if width <= 3 else 7.2)
             if r_index == 0:
-                set_cell_shading(cell, "DCE6F1")
+                set_cell_shading(cell, "17324D")
                 for run in paragraph.runs:
                     run.bold = True
+                    run.font.color.rgb = RGBColor(255, 255, 255)
+            elif r_index % 2 == 0:
+                set_cell_shading(cell, "F1F5F8")
     spacer = document.add_paragraph()
     spacer.paragraph_format.space_after = Pt(1)
     spacer.paragraph_format.space_before = Pt(0)
@@ -123,52 +183,57 @@ def main() -> None:
     document.core_properties.keywords = "quantum circuit simulation, reproducibility, resource-aware scheduling"
 
     for section in document.sections:
-        section.page_width = Inches(8.5)
-        section.page_height = Inches(11)
-        section.top_margin = Inches(0.68)
-        section.bottom_margin = Inches(0.78)
-        section.left_margin = Inches(0.63)
-        section.right_margin = Inches(0.63)
-        set_columns(section, 1)
+        configure_section(section, 1)
 
     normal = document.styles["Normal"]
     normal.font.name = FONT
     normal._element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
-    normal.font.size = Pt(9)
-    normal.paragraph_format.space_after = Pt(3)
-    normal.paragraph_format.line_spacing = 1.0
+    normal.font.size = Pt(9.25)
+    normal.paragraph_format.space_after = Pt(4)
+    normal.paragraph_format.line_spacing = 1.03
     normal.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    normal.paragraph_format.widow_control = True
 
     heading1 = document.styles["Heading 1"]
     heading1.font.name = FONT
     heading1._element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
-    heading1.font.size = Pt(9.5)
+    heading1.font.size = Pt(10)
     heading1.font.bold = True
     heading1.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
     heading1.paragraph_format.keep_with_next = True
-    heading1.paragraph_format.space_before = Pt(7)
-    heading1.paragraph_format.space_after = Pt(3)
+    heading1.paragraph_format.space_before = Pt(9)
+    heading1.paragraph_format.space_after = Pt(4)
 
     heading2 = document.styles["Heading 2"]
     heading2.font.name = FONT
     heading2._element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
-    heading2.font.size = Pt(9)
+    heading2.font.size = Pt(9.25)
     heading2.font.bold = True
     heading2.font.italic = True
     heading2.paragraph_format.keep_with_next = True
     heading2.paragraph_format.space_before = Pt(4)
     heading2.paragraph_format.space_after = Pt(2)
 
+    for style_name in ("List Number",):
+        style = document.styles[style_name]
+        style.font.name = FONT
+        style._element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
+        style.font.size = Pt(9.25)
+        style.paragraph_format.space_after = Pt(4)
+        style.paragraph_format.line_spacing = 1.03
+
     title_paragraph = document.add_paragraph()
     title_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title_paragraph.paragraph_format.space_after = Pt(9)
+    title_paragraph.paragraph_format.space_after = Pt(10)
+    title_paragraph.paragraph_format.keep_with_next = True
     title_run = title_paragraph.add_run(title)
-    set_run_font(title_run, size=20, bold=True)
+    set_run_font(title_run, size=19, bold=True)
 
     for text, size, bold in ((author_line, 11, True), (affiliation, 9, False), (email, 8.5, False)):
         paragraph = document.add_paragraph()
         paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         paragraph.paragraph_format.space_after = Pt(1)
+        paragraph.paragraph_format.keep_with_next = True
         run = paragraph.add_run(text)
         set_run_font(run, size=size, bold=bold)
 
@@ -183,19 +248,13 @@ def main() -> None:
             index += 1
             continue
         if line == "<!-- TWO_COLUMN -->":
-            section = document.add_section(WD_SECTION_START.CONTINUOUS)
-            section.page_width = Inches(8.5)
-            section.page_height = Inches(11)
-            section.top_margin = Inches(0.68)
-            section.bottom_margin = Inches(0.78)
-            section.left_margin = Inches(0.63)
-            section.right_margin = Inches(0.63)
-            set_columns(section, 2)
             title_block_end = True
             index += 1
             continue
         if line.startswith("## "):
             paragraph = document.add_paragraph(style="Heading 1" if re.match(r"## [IVX]+\.", line) else "Heading 2")
+            if paragraph.style.name == "Heading 1":
+                paragraph.paragraph_format.page_break_before = True
             add_inline(paragraph, line[3:])
             index += 1
             continue
@@ -220,6 +279,7 @@ def main() -> None:
             paragraph = document.add_paragraph()
             paragraph.paragraph_format.space_after = Pt(5)
             paragraph.paragraph_format.line_spacing = 1.0
+            paragraph.paragraph_format.keep_together = True
             add_inline(paragraph, line, size=8.5)
             index += 1
             continue
@@ -230,6 +290,8 @@ def main() -> None:
             paragraph.paragraph_format.space_before = Pt(4)
             paragraph.paragraph_format.space_after = Pt(2)
             add_inline(paragraph, line, size=8)
+            for run in paragraph.runs:
+                run.bold = True
             index += 1
             continue
         if line.startswith("[") and re.match(r"\[\d+\]", line):
@@ -244,6 +306,8 @@ def main() -> None:
         paragraph = document.add_paragraph()
         if title_block_end:
             paragraph.paragraph_format.first_line_indent = Inches(0.14)
+        paragraph.paragraph_format.widow_control = True
+        paragraph.paragraph_format.keep_together = True
         add_inline(paragraph, line)
         index += 1
 
