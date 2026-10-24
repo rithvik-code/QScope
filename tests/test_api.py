@@ -50,6 +50,39 @@ def test_health_reports_environment(client: TestClient) -> None:
     assert payload["python"].startswith("3.")
 
 
+def test_circuit_drafts_are_saved_versioned_and_restorable(client: TestClient) -> None:
+    created = expect_ok(
+        client.post("/api/drafts", json={"name": "Saved Bell", "circuit": {"format": "qscope-circuit", "version": "1.0", "name": "Bell", "num_qubits": 2, "num_clbits": 0, "operations": []}}),
+        "draft_id", "document", "version",
+    )
+    draft_id = created["draft_id"]
+    changed = dict(created["document"])
+    changed["operations"] = [{"name": "H", "targets": [0], "controls": [], "params": [], "kind": "gate"}]
+    updated = expect_ok(client.put(f"/api/drafts/{draft_id}", json={"name": "Saved Bell", "circuit": changed, "favorite": True}), "version", "favorite")
+    assert updated["version"] == 2
+    assert updated["favorite"] is True
+    versions = expect_ok(client.get(f"/api/drafts/{draft_id}/versions"), "versions")["versions"]
+    assert [entry["version"] for entry in versions] == [2, 1]
+    restored = expect_ok(client.post(f"/api/drafts/{draft_id}/restore/1"), "document", "version")
+    assert restored["version"] == 3
+    assert restored["document"]["operations"] == []
+
+
+def test_project_bundle_round_trip_filters_unknown_settings(client: TestClient) -> None:
+    circuit = expect_ok(client.post("/api/circuit/document", json={"algorithm": "bell_state"}), "operations")
+    response = client.post(
+        "/api/project/export",
+        json={"name": "Bell study", "circuit": circuit, "settings": {"shots": 512, "api_key": "must-not-export"}},
+    )
+    assert response.status_code == 200
+    bundle = response.json()
+    assert bundle["format"] == "qscope-project"
+    assert "api_key" not in bundle["settings"]
+    imported = expect_ok(client.post("/api/project/import", json={"project": bundle}), "circuit", "settings")
+    assert imported["settings"] == {"shots": 512}
+    assert imported["circuit"]["operations"] == circuit["operations"]
+
+
 def test_meta_fills_every_picker(client: TestClient) -> None:
     payload = expect_ok(
         client.get("/api/meta"),
