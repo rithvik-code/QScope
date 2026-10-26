@@ -9,8 +9,10 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 from docx.text.paragraph import Paragraph
 
@@ -33,6 +35,22 @@ WHITE = "#FFFFFF"
 DARK = "#0C111B"
 DARK_PANEL = "#141C29"
 DARK_LINE = "#2A3547"
+NAVY = "16243A"
+
+
+def set_cell_margins(cell, *, top=70, start=100, bottom=70, end=100):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    margins = tc_pr.first_child_found_in("w:tcMar")
+    if margins is None:
+        margins = OxmlElement("w:tcMar")
+        tc_pr.append(margins)
+    for side, value in (("top", top), ("start", start), ("bottom", bottom), ("end", end)):
+        node = margins.find(qn(f"w:{side}"))
+        if node is None:
+            node = OxmlElement(f"w:{side}")
+            margins.append(node)
+        node.set(qn("w:w"), str(value))
+        node.set(qn("w:type"), "dxa")
 
 
 def font(size: int, weight: str = "regular") -> ImageFont.FreeTypeFont:
@@ -495,15 +513,6 @@ def insert_after(paragraph: Paragraph, *, image_bytes: bytes | None = None, capt
         run.font.color.rgb = RGBColor(74, 91, 109)
 
 
-def insert_figure(doc, anchor, figure_number, caption, image_bytes):
-    target = next((p for p in doc.paragraphs if anchor in p.text), None)
-    if target is None:
-        raise ValueError(f"Could not find insertion point: {anchor}")
-    insert_after(target, image_bytes=image_bytes)
-    image_p = Paragraph(target._p.getnext(), target._parent)
-    insert_after(image_p, caption=f"Fig. {figure_number}. {caption}")
-
-
 def editable_cell(cell, heading, body, accent, fill):
     cell.text = ""
     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
@@ -533,7 +542,7 @@ def editable_cell(cell, heading, body, accent, fill):
     run = p2.add_run(body)
     run.font.name = "Aptos"
     run.font.size = Pt(9)
-    run.font.color.rgb = RGBColor.from_string(INK)
+    run.font.color.rgb = RGBColor.from_string(INK.lstrip("#"))
 
 
 def editable_arrow(cell):
@@ -583,6 +592,25 @@ def insert_editable_steps(doc, anchor, figure_number, caption, steps, *, note=No
     run.font.color.rgb = RGBColor(74, 91, 109)
 
 
+def insert_editable_branches(doc, anchor, heading, left, right):
+    target = next((p for p in doc.paragraphs if anchor in p.text), None)
+    if target is None:
+        raise ValueError(f"Could not find insertion point: {anchor}")
+    table = doc.add_table(rows=2, cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    for row in table.rows:
+        row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        for cell in row.cells:
+            cell.width = Inches(3.35)
+    top = table.cell(0, 0).merge(table.cell(0, 1))
+    editable_cell(top, heading, "Choose the outcome from the budget check.", "8069E8", "F4F1FF")
+    editable_cell(table.cell(1, 0), *left)
+    editable_cell(table.cell(1, 1), *right)
+    table._tbl.getparent().remove(table._tbl)
+    target._p.addnext(table._tbl)
+
+
 def insert_editable_comparison(doc, anchor, figure_number, caption):
     target = next((p for p in doc.paragraphs if anchor in p.text), None)
     if target is None:
@@ -627,6 +655,8 @@ def insert_editable_comparison(doc, anchor, figure_number, caption):
                     run.font.name = "Aptos"
                     run.font.size = Pt(8)
                     run.font.color.rgb = RGBColor.from_string(INK)
+    for row in table.rows:
+        row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
     table._tbl.getparent().remove(table._tbl)
     target._p.addnext(table._tbl)
     caption_node = OxmlElement("w:p")
@@ -678,13 +708,6 @@ def main():
     if OUTPUT.exists():
         raise FileExistsError(f"Refusing to overwrite existing output: {OUTPUT}")
 
-    figures = [
-        fig_workflow(),
-        fig_architecture_flow(),
-        fig_simulation_tradeoffs(),
-        fig_execution_safety(),
-        fig_results_lifecycle(),
-    ]
     doc = Document(SOURCE)
     clean_manuscript(doc)
     anchors = [
@@ -701,13 +724,37 @@ def main():
         "Resource-aware execution path: validate and estimate first, refuse requests that exceed the configured budget, and attach provenance to completed runs.",
         "Lifecycle of simulation results through trace and analysis, stored history, reproduction, comparison, export, and evidence-grounded research assistance.",
     ]
-    for index, (anchor, caption) in enumerate(zip(anchors, captions), start=1):
-        insert_figure(doc, anchor, index, caption, figures[index - 1])
+    insert_editable_steps(doc, anchors[0], 1, captions[0], [
+        ("01 · START", "Choose a learning goal, a guided template, an imported QASM circuit, or a blank canvas.", "4E8EF7", "EFF5FF"),
+        ("02 · BUILD", "Create or edit the circuit and select the simulator settings.", "8069E8", "F4F1FF"),
+        ("03 · RUN", "Validate the circuit, estimate resources, and execute within configured limits.", "12B89C", "ECFBF7"),
+        ("04 · UNDERSTAND", "Inspect outcomes, probabilities, traces, and analysis with clear assumptions.", "E4A13A", "FFF7E9"),
+        ("05 · RETURN", "Save a snapshot, then reproduce, compare, extend, or export it.", "D66C84", "FFF1F4"),
+    ], note=("ONE CONTINUOUS LOOP", "The circuit, settings, result, and provenance stay connected through the workflow.", "12B89C", "ECFBF7"))
+    insert_editable_steps(doc, anchors[1], 2, captions[1], [
+        ("FRONTEND · React + TypeScript", "Circuit workspace, templates, settings, results, and history presented in the browser.", "4E8EF7", "EFF5FF"),
+        ("LOCAL API · FastAPI + Pydantic", "Validates requests and exchanges structured circuit, run, and result data.", "8069E8", "F4F1FF"),
+        ("SIMULATION ENGINE · Python + NumPy", "Builds states, applies gates, samples measurements, and computes supported analyses.", "12B89C", "ECFBF7"),
+        ("PERSISTENCE · SQLite + local files", "Stores saved circuits, run settings, results, and reproducibility metadata locally.", "E4A13A", "FFF7E9"),
+    ], note=("OPTIONAL ASSISTANT", "The local research assistant can explain QScope concepts and use available circuit or run context when responding.", "8069E8", "F4F1FF"))
+    insert_editable_comparison(doc, anchors[2], 3, captions[2])
+    insert_editable_steps(doc, anchors[3], 4, captions[3], [
+        ("1 · RECEIVE RUN REQUEST", "Read the circuit, shot count, noise options, backend, and configured resource limits.", "4E8EF7", "EFF5FF"),
+        ("2 · VALIDATE + ESTIMATE", "Check inputs and estimate representation memory and execution work before simulation.", "8069E8", "F4F1FF"),
+        ("3 · CHECK THE BUDGET", "Compare the estimates with the configured limits and select the appropriate path below.", "E4A13A", "FFF7E9"),
+    ])
+    insert_editable_branches(doc, anchors[3], "4 · BUDGET DECISION", ("OVER LIMIT · REFUSE SAFELY", "Return the reason and estimate without starting the simulation.", "D66C84", "FFF1F4"), ("WITHIN LIMIT · EXECUTE", "Run locally and attach settings, backend, and provenance to the result.", "12B89C", "ECFBF7"))
+    insert_editable_steps(doc, anchors[4], 5, captions[4], [
+        ("SIMULATION RESULT", "Counts and probabilities, backend and representation, shot count, seed, noise mode, runtime, and state memory.", "4E8EF7", "EFF5FF"),
+        ("TRACE + ANALYZE", "Inspect gate-by-gate changes, state metrics, and supported analyses with their limitations.", "8069E8", "F4F1FF"),
+        ("HISTORY RECORD", "Keep the circuit snapshot, run settings, measured result, timestamp, and provenance together.", "12B89C", "ECFBF7"),
+        ("REPRODUCE · COMPARE · EXTEND · EXPORT", "Return to a saved run and use it as the starting point for the next experiment.", "E4A13A", "FFF7E9"),
+    ], note=("RESEARCH ASSISTANT", "Ask about a circuit, trace, run, or saved record. The assistant should ground explanations in available project evidence and say when information is missing.", "8069E8", "F4F1FF"))
     doc.core_properties.title = "QScope: A Local-First, Resource-Aware Quantum Circuit Simulation and Research Workspace"
-    doc.core_properties.subject = "Research manuscript with explanatory workflow, architecture, simulation, execution, and reproducibility diagrams"
+    doc.core_properties.subject = "Research manuscript with editable Word workflow, architecture, simulation, execution, and reproducibility diagrams"
     doc.save(OUTPUT)
     print(f"Wrote {OUTPUT}")
-    print(f"Saved 5 explanatory figures to {FIGURE_DIR}")
+    print("Added five editable Word diagrams; no diagram images are embedded.")
 
 
 if __name__ == "__main__":
