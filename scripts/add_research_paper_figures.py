@@ -17,7 +17,7 @@ from docx.text.paragraph import Paragraph
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "QScope_Research_Paper_Rithvik.docx"
-OUTPUT = ROOT / "QScope_Research_Paper_Rithvik_Illustrated_v5.docx"
+OUTPUT = ROOT / "QScope_Research_Paper_Rithvik_Illustrated_v7.docx"
 FIGURE_DIR = ROOT / "docs" / "research_figures"
 W, H = 1800, 1120
 
@@ -502,6 +502,144 @@ def insert_figure(doc, anchor, figure_number, caption, image_bytes):
     insert_after(target, image_bytes=image_bytes)
     image_p = Paragraph(target._p.getnext(), target._parent)
     insert_after(image_p, caption=f"Fig. {figure_number}. {caption}")
+
+
+def editable_cell(cell, heading, body, accent, fill):
+    cell.text = ""
+    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+    set_cell_margins(cell, top=105, start=145, bottom=105, end=145)
+    shade = OxmlElement("w:shd")
+    shade.set(qn("w:fill"), fill)
+    cell._tc.get_or_add_tcPr().append(shade)
+    borders = OxmlElement("w:tcBorders")
+    for edge in ("top", "left", "bottom", "right"):
+        node = OxmlElement(f"w:{edge}")
+        node.set(qn("w:val"), "single")
+        node.set(qn("w:sz"), "10" if edge == "top" else "5")
+        node.set(qn("w:color"), accent)
+        borders.append(node)
+    cell._tc.get_or_add_tcPr().append(borders)
+    p = cell.paragraphs[0]
+    p.paragraph_format.space_after = Pt(2)
+    p.paragraph_format.keep_together = True
+    run = p.add_run(heading)
+    run.bold = True
+    run.font.name = "Aptos"
+    run.font.size = Pt(9.5)
+    run.font.color.rgb = RGBColor.from_string(accent)
+    p2 = cell.add_paragraph()
+    p2.paragraph_format.space_after = Pt(0)
+    p2.paragraph_format.keep_together = True
+    run = p2.add_run(body)
+    run.font.name = "Aptos"
+    run.font.size = Pt(9)
+    run.font.color.rgb = RGBColor.from_string(INK)
+
+
+def editable_arrow(cell):
+    cell.text = "↓"
+    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+    p = cell.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_after = Pt(0)
+    p.paragraph_format.line_spacing = 1.0
+    run = p.runs[0]
+    run.font.name = "Aptos"
+    run.font.size = Pt(13)
+    run.font.bold = True
+    run.font.color.rgb = RGBColor.from_string(TEAL)
+
+
+def insert_editable_steps(doc, anchor, figure_number, caption, steps, *, note=None):
+    target = next((p for p in doc.paragraphs if anchor in p.text), None)
+    if target is None:
+        raise ValueError(f"Could not find insertion point: {anchor}")
+    table = doc.add_table(rows=len(steps) * 2 - 1 + (1 if note else 0), cols=1)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    for row in table.rows:
+        row.cells[0].width = Inches(6.85)
+        tr_pr = row._tr.get_or_add_trPr()
+        tr_pr.append(OxmlElement("w:cantSplit"))
+    for index, (heading, body, accent, fill) in enumerate(steps):
+        editable_cell(table.cell(index * 2, 0), heading, body, accent, fill)
+        if index < len(steps) - 1:
+            editable_arrow(table.cell(index * 2 + 1, 0))
+    if note:
+        editable_cell(table.cell(len(steps) * 2 - 1, 0), note[0], note[1], note[2], note[3])
+    table._tbl.getparent().remove(table._tbl)
+    target._p.addnext(table._tbl)
+    caption_node = OxmlElement("w:p")
+    table._tbl.addnext(caption_node)
+    caption_p = Paragraph(caption_node, target._parent)
+    caption_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    caption_p.paragraph_format.space_before = Pt(3)
+    caption_p.paragraph_format.space_after = Pt(8)
+    caption_p.paragraph_format.keep_with_next = False
+    run = caption_p.add_run(f"Fig. {figure_number}. {caption}")
+    run.font.name = "Times New Roman"
+    run.font.size = Pt(8.5)
+    run.font.italic = True
+    run.font.color.rgb = RGBColor(74, 91, 109)
+
+
+def insert_editable_comparison(doc, anchor, figure_number, caption):
+    target = next((p for p in doc.paragraphs if anchor in p.text), None)
+    if target is None:
+        raise ValueError(f"Could not find insertion point: {anchor}")
+    headers = ["Representation", "State model", "Memory growth", "Useful for"]
+    rows = [
+        ["State vector", "Pure-state amplitude vector", "O(2ⁿ) complex values", "Ideal evolution and sampled pure-state paths"],
+        ["Density matrix", "Mixed-state density operator", "O(4ⁿ) complex values", "Exact mixed-state evolution for supported noise"],
+        ["Trajectory", "Sampled pure-state paths", "O(2ⁿ) per path; work grows with samples", "Approximate noisy evolution when exact matrices are costly"],
+    ]
+    table = doc.add_table(rows=1, cols=4)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    widths = [1.25, 1.85, 1.55, 2.2]
+    for idx, text in enumerate(headers):
+        cell = table.rows[0].cells[idx]
+        cell.width = Inches(widths[idx])
+        cell.text = text
+        shade = OxmlElement("w:shd")
+        shade.set(qn("w:fill"), NAVY)
+        cell._tc.get_or_add_tcPr().append(shade)
+        set_cell_margins(cell, top=90, start=90, bottom=90, end=90)
+        for run in cell.paragraphs[0].runs:
+            run.bold = True
+            run.font.name = "Aptos"
+            run.font.size = Pt(8)
+            run.font.color.rgb = RGBColor(255, 255, 255)
+    for index, values in enumerate(rows):
+        cells = table.add_row().cells
+        table.rows[-1]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        for col, text in enumerate(values):
+            cell = cells[col]
+            cell.width = Inches(widths[col])
+            cell.text = text
+            set_cell_margins(cell, top=90, start=90, bottom=90, end=90)
+            shade = OxmlElement("w:shd")
+            shade.set(qn("w:fill"), "F3F7FB" if index % 2 == 0 else "FFFFFF")
+            cell._tc.get_or_add_tcPr().append(shade)
+            for p in cell.paragraphs:
+                p.paragraph_format.space_after = Pt(0)
+                for run in p.runs:
+                    run.font.name = "Aptos"
+                    run.font.size = Pt(8)
+                    run.font.color.rgb = RGBColor.from_string(INK)
+    table._tbl.getparent().remove(table._tbl)
+    target._p.addnext(table._tbl)
+    caption_node = OxmlElement("w:p")
+    table._tbl.addnext(caption_node)
+    caption_p = Paragraph(caption_node, target._parent)
+    caption_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    caption_p.paragraph_format.space_before = Pt(3)
+    caption_p.paragraph_format.space_after = Pt(8)
+    run = caption_p.add_run(f"Fig. {figure_number}. {caption}")
+    run.font.name = "Times New Roman"
+    run.font.size = Pt(8.5)
+    run.font.italic = True
+    run.font.color.rgb = RGBColor(74, 91, 109)
 
 
 def clean_manuscript(doc):
