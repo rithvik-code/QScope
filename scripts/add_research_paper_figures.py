@@ -17,7 +17,7 @@ from docx.text.paragraph import Paragraph
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "QScope_Research_Paper_Rithvik.docx"
-OUTPUT = ROOT / "QScope_Research_Paper_Rithvik_Illustrated_v3.docx"
+OUTPUT = ROOT / "QScope_Research_Paper_Rithvik_Illustrated_v5.docx"
 FIGURE_DIR = ROOT / "docs" / "research_figures"
 W, H = 1800, 1120
 
@@ -324,6 +324,154 @@ def fig_benchmark() -> bytes:
     return save_image(im, "qscope-figure-05-benchmark-v3.png")
 
 
+def arrow(draw, start, end, color=TEAL, width=5):
+    draw.line((start[0], start[1], end[0], end[1]), fill=color, width=width)
+    angle = math.atan2(end[1] - start[1], end[0] - start[0])
+    size = 18
+    points = [
+        end,
+        (end[0] - size * math.cos(angle - 0.55), end[1] - size * math.sin(angle - 0.55)),
+        (end[0] - size * math.cos(angle + 0.55), end[1] - size * math.sin(angle + 0.55)),
+    ]
+    draw.polygon(points, fill=color)
+
+
+def diagram_card(draw, bounds, heading, body, accent=TEAL, *, fill=WHITE):
+    x1, y1, x2, y2 = bounds
+    rounded(draw, bounds, fill, LINE, 22, 2)
+    draw.rounded_rectangle((x1, y1, x2, y1 + 13), radius=7, fill=accent)
+    draw.text((x1 + 24, y1 + 33), heading, font=font(22, "bold"), fill=INK)
+    paragraph(draw, (x1 + 24, y1 + 76), body, font(17), "#43566B", x2 - x1 - 48, 7)
+
+
+def fig_workflow() -> bytes:
+    im, d, fg, sub = canvas(label="Q S C O P E   /   PROJECT WORKFLOW")
+    title(d, "From a question to a reproducible experiment")
+    stages = [
+        ("01  START", "Choose a learning goal, a guided template, an algorithm, imported QASM, or a blank circuit.", BLUE),
+        ("02  BUILD", "Compose and inspect the circuit. The engine validates gates, wires, and circuit resources.", TEAL),
+        ("03  PLAN + RUN", "Check memory requirements, select a supported simulation path, and execute locally.", VIOLET),
+        ("04  UNDERSTAND", "Read outcomes and probabilities, trace gate effects, and explore analysis or optimization.", AMBER),
+        ("05  RETURN", "Reproduce, compare, or extend a saved run; export a report when ready.", "#D66C84"),
+    ]
+    x0, gap, boxw = 66, 34, 310
+    for index, (heading, body, accent) in enumerate(stages):
+        x = x0 + index * (boxw + gap)
+        diagram_card(d, (x, 330, x + boxw, 725), heading, body, accent)
+        if index < len(stages) - 1:
+            arrow(d, (x + boxw + 3, 522), (x + boxw + gap - 4, 522))
+    rounded(d, (100, 828, 1700, 1014), "#E9F6F3", "#B8E4D9", 20, 2)
+    d.text((132, 852), "ONE SHARED EXPERIMENT CONTEXT", font=font(19, "bold"), fill="#168E78")
+    paragraph(d, (132, 895), "Circuit + settings + result provenance move with the user between Build, Execute, Trace, Analyze, History, and Research.", font(19), "#43566B", 1520, 9)
+    return save_image(im, "qscope-figure-01-workflow.png")
+
+
+def fig_architecture_flow() -> bytes:
+    im, d, fg, sub = canvas(label="Q S C O P E   /   SOFTWARE ARCHITECTURE")
+    title(d, "The interface and engine meet through a local API")
+    cards = [
+        (70, 305, 440, 680, "FRONTEND", "React + TypeScript; circuit editor; guided modes; canvas; state and trace views; history; reports; chat.", BLUE),
+        (510, 305, 850, 680, "API LAYER", "FastAPI + Pydantic; HTTP endpoints and WebSockets; request validation; structured results and errors.", TEAL),
+        (920, 305, 1260, 680, "QUANTUM ENGINE", "Python + NumPy; circuit model and simulation; trace; analysis; optimization; resource planning.", VIOLET),
+        (1330, 305, 1730, 680, "LOCAL DATA", "SQLite + local files; experiment history; circuit snapshots and settings; report exports.", AMBER),
+    ]
+    for x1, y1, x2, y2, heading, body, accent in cards:
+        diagram_card(d, (x1, y1, x2, y2), heading, body, accent)
+    arrow(d, (444, 490), (504, 490))
+    arrow(d, (854, 490), (914, 490))
+    arrow(d, (1264, 490), (1324, 490))
+    arrow(d, (505, 730), (445, 730), color=BLUE)
+    d.text((450, 756), "result + provenance", font=font(14, "semibold"), fill=BLUE)
+    rounded(d, (170, 830, 1630, 1000), "#F2F6FA", LINE, 20, 2)
+    d.text((202, 853), "OPTIONAL ASSISTANT NARRATION", font=font(18, "bold"), fill="#6552C6")
+    paragraph(d, (202, 892), "The assistant receives explicit QScope evidence. A configured OpenAI-compatible endpoint may rewrite the explanation; computed values remain sourced from the local engine.", font(17), "#43566B", 1380, 7)
+    return save_image(im, "qscope-figure-02-architecture.png")
+
+
+def fig_simulation_tradeoffs() -> bytes:
+    im, d, fg, sub = canvas(label="Q S C O P E   /   SIMULATION REPRESENTATIONS")
+    title(d, "Choose a state representation that fits the question")
+    # Log2 storage growth: one complex value per vector entry, or per matrix entry.
+    x0, y0, x1, y1 = 190, 350, 1605, 815
+    for n in range(0, 13, 2):
+        xx = x0 + n / 12 * (x1 - x0)
+        d.line((xx, y0, xx, y1), fill="#E6ECF2", width=2)
+        d.text((xx - 7, y1 + 15), str(n), font=font(16), fill=MUTED)
+    for value in range(0, 25, 4):
+        yy = y1 - value / 24 * (y1 - y0)
+        d.line((x0, yy, x1, yy), fill="#E6ECF2", width=2)
+        d.text((116, yy - 10), str(value), font=font(15), fill=MUTED)
+    d.text((785, 864), "number of qubits (n)", font=font(18, "semibold"), fill=INK)
+    d.text((72, 272), "log₂ of complex storage entries · asymptotic growth", font=font(18, "semibold"), fill=INK)
+    def plot_line(points, color, width=6, *, dashed=False, triangle=False):
+        mapped = [(x0 + n / 12 * (x1 - x0), y1 - v / 24 * (y1 - y0)) for n, v in points]
+        if dashed:
+            for (xa, ya), (xb, yb) in zip(mapped, mapped[1:]):
+                length = math.hypot(xb - xa, yb - ya)
+                for offset in range(0, int(length), 28):
+                    end_offset = min(offset + 15, length)
+                    t0, t1 = offset / length, end_offset / length
+                    d.line((xa + (xb - xa) * t0, ya + (yb - ya) * t0,
+                            xa + (xb - xa) * t1, ya + (yb - ya) * t1), fill=color, width=width)
+        else:
+            d.line(mapped, fill=color, width=width)
+        for x, y in mapped[::2]:
+            if triangle:
+                d.polygon([(x, y - 9), (x - 8, y + 7), (x + 8, y + 7)], fill=color)
+            else:
+                d.ellipse((x - 7, y - 7, x + 7, y + 7), fill=color)
+    plot_line([(n, n) for n in range(13)], BLUE)
+    plot_line([(n, 2 * n) for n in range(13)], VIOLET)
+    legend = [("State vector · O(2ⁿ)", BLUE), ("Density matrix · O(4ⁿ)", VIOLET), ("Trajectory · O(2ⁿ) per sampled path", TEAL)]
+    # Trajectories store pure-state vectors; total work also depends on samples.
+    plot_line([(n, n) for n in range(13)], TEAL, 3, dashed=True, triangle=True)
+    lx = 220
+    for label, color in legend:
+        d.line((lx, 954, lx + 50, 954), fill=color, width=6)
+        d.text((lx + 62, 941), label, font=font(16, "semibold"), fill=INK)
+        lx += 500
+    d.text((92, 1044), "Conceptual memory scaling, not measured runtime. Density-matrix storage grows quadratically in state-vector dimension; trajectory cost also depends on the number of samples.", font=font(14), fill=MUTED)
+    return save_image(im, "qscope-figure-03-representations.png")
+
+
+def fig_execution_safety() -> bytes:
+    im, d, fg, sub = canvas(label="Q S C O P E   /   RESOURCE-AWARE EXECUTION")
+    title(d, "Every run is planned before the simulator allocates state")
+    diagram_card(d, (92, 270, 540, 466), "RUN REQUEST", "Circuit and backend preference; shots; seed; noise settings; memory budget.", BLUE)
+    diagram_card(d, (684, 270, 1132, 466), "VALIDATE + ESTIMATE", "Resolve the circuit source; estimate state and peak memory; check supported engine paths.", TEAL)
+    arrow(d, (545, 368), (676, 368))
+    # Decision diamond
+    diamond = [(900, 570), (1120, 690), (900, 810), (680, 690)]
+    d.polygon(diamond, fill="#F5F2FF", outline=VIOLET)
+    d.line(diamond + [diamond[0]], fill=VIOLET, width=4)
+    d.text((790, 663), "Within the\nconfigured budget?", font=font(21, "bold"), fill=INK, align="center")
+    arrow(d, (908, 470), (908, 562), color=VIOLET)
+    diagram_card(d, (90, 850, 680, 1030), "NO · REFUSE SAFELY", "Return the estimate and limiting constraint; do not present a simulation result.", "#D66C84")
+    diagram_card(d, (1120, 850, 1710, 1030), "YES · EXECUTE LOCALLY", "Select an engine and run the circuit; attach mode, seed, shots, timing, and memory provenance.", TEAL)
+    arrow(d, (680, 690), (388, 842), color="#D66C84")
+    arrow(d, (1120, 690), (1415, 842), color=TEAL)
+    d.text((422, 722), "No", font=font(16, "bold"), fill="#D66C84")
+    d.text((1285, 722), "Yes", font=font(16, "bold"), fill=TEAL)
+    return save_image(im, "qscope-figure-04-execution.png")
+
+
+def fig_results_lifecycle() -> bytes:
+    im, d, fg, sub = canvas(label="Q S C O P E   /   RESULTS AND REPRODUCIBILITY")
+    title(d, "A run becomes a record you can inspect and revisit")
+    diagram_card(d, (84, 290, 470, 610), "SIMULATION RESULT", "Counts and probabilities; backend and representation; shots, seed, and noise mode; runtime and state memory.", BLUE)
+    diagram_card(d, (550, 290, 936, 610), "TRACE + ANALYZE", "Gate-by-gate state changes; entanglement and state metrics; optimization with verification; stated limits.", VIOLET)
+    diagram_card(d, (1016, 290, 1402, 610), "HISTORY RECORD", "Circuit snapshot; run settings and provenance; measured result; timestamp and label.", TEAL)
+    diagram_card(d, (1482, 290, 1718, 610), "NEXT", "Reproduce; compare; extend; export.", AMBER)
+    arrow(d, (475, 450), (544, 450))
+    arrow(d, (941, 450), (1010, 450))
+    arrow(d, (1407, 450), (1476, 450))
+    rounded(d, (190, 760, 1610, 988), "#F2F6FA", LINE, 22, 2)
+    d.text((228, 786), "RESEARCH ASSISTANT", font=font(19, "bold"), fill="#6552C6")
+    paragraph(d, (228, 834), "Attach the circuit, run, trace, or stored records needed for a question. QScope answers from those artifacts, cites available evidence, and states when the data is insufficient.", font(18), "#43566B", 1340, 8)
+    arrow(d, (1220, 620), (1220, 716), color=TEAL)
+    return save_image(im, "qscope-figure-05-lifecycle.png")
+
+
 def insert_after(paragraph: Paragraph, *, image_bytes: bytes | None = None, caption: str | None = None) -> None:
     node = OxmlElement("w:p")
     paragraph._p.addnext(node)
@@ -393,29 +541,35 @@ def main():
         raise FileExistsError(f"Refusing to overwrite existing output: {OUTPUT}")
 
     figures = [
-        fig_workspace(),
-        fig_architecture(),
-        fig_modes(),
-        fig_scheduler(),
-        fig_benchmark(),
+        fig_workflow(),
+        fig_architecture_flow(),
+        fig_simulation_tradeoffs(),
+        fig_execution_safety(),
+        fig_results_lifecycle(),
     ]
     doc = Document(SOURCE)
     clean_manuscript(doc)
-    insert_figure(doc, "The central engineering goal is to make execution assumptions visible", 1,
-                  "Illustrative redraw of the live QScope workspace. The Bell-state circuit is shown loaded but not yet run, matching the application state.", figures[0])
-    insert_figure(doc, "The API is hosted locally; no cloud service or quantum-hardware provider is required", 2,
-                  "QScope software layers and local experiment loop. Arrows represent the primary request/data flow.", figures[1])
-    insert_figure(doc, "not by a claim of universal device-level fidelity", 3,
-                  "Conceptual comparison of QScope's three simulation representations. Amplitudes and matrix values are schematic; memory orders omit temporary arrays and overhead.", figures[2])
-    insert_figure(doc, "not a hard operating-system isolation boundary", 4,
-                  "Illustrative memory-bounded scheduling. Job memory values are abstract units; the scheduler uses per-job peak estimates and the configured shared budget.", figures[3])
-    insert_figure(doc, "Across the tested points, the median increased", 5,
-                  "Local median runtime by qubit count on a logarithmic axis. Trial max–min spreads are reported in Table II.", figures[4])
+    anchors = [
+        "The central engineering goal is to make execution assumptions visible",
+        "The API is hosted locally; no cloud service or quantum-hardware provider is required",
+        "not by a claim of universal device-level fidelity",
+        "not a hard operating-system isolation boundary",
+        "Across the tested points, the median increased",
+    ]
+    captions = [
+        "QScope user workflow from choosing a starting point to returning to saved, reproducible work.",
+        "Local software architecture and data flow among the React frontend, FastAPI layer, Python/NumPy engine, and SQLite-backed storage.",
+        "Conceptual asymptotic memory growth for the state-vector, density-matrix, and trajectory representations; this chart is not a runtime measurement.",
+        "Resource-aware execution path: validate and estimate first, refuse requests that exceed the configured budget, and attach provenance to completed runs.",
+        "Lifecycle of simulation results through trace and analysis, stored history, reproduction, comparison, export, and evidence-grounded research assistance.",
+    ]
+    for index, (anchor, caption) in enumerate(zip(anchors, captions), start=1):
+        insert_figure(doc, anchor, index, caption, figures[index - 1])
     doc.core_properties.title = "QScope: A Local-First, Resource-Aware Quantum Circuit Simulation and Research Workspace"
-    doc.core_properties.subject = "Illustrated research manuscript with project-specific diagrams and measured benchmark data"
+    doc.core_properties.subject = "Research manuscript with explanatory workflow, architecture, simulation, execution, and reproducibility diagrams"
     doc.save(OUTPUT)
     print(f"Wrote {OUTPUT}")
-    print(f"Saved 5 reusable figures to {FIGURE_DIR}")
+    print(f"Saved 5 explanatory figures to {FIGURE_DIR}")
 
 
 if __name__ == "__main__":
