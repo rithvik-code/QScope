@@ -37,6 +37,9 @@ qscope = "qscope.__main__:main"
 [project.urls]
 Documentation = "https://github.com/qscope/qscope#readme"
 
+[tool.vercel]
+entrypoint = "qscope.api.app:app"
+
 [tool.setuptools]
 packages = [
   "qscope",
