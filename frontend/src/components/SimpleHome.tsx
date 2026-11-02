@@ -75,7 +75,7 @@ export function SimpleHome({ onNavigate }: { onNavigate: (mode: ModeKey) => void
         <Panel title="Your workspace" subtitle="A quiet place to experiment." dense>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl bg-[var(--c-panel-2)] p-3"><div className="label-xs">engine</div><div className="mt-1 text-sm">{health ? "ready" : "connecting"}</div></div>
-            <div className="rounded-xl bg-[var(--c-panel-2)] p-3"><div className="label-xs">mode</div><div className="mt-1 text-sm">offline</div></div>
+            <div className="rounded-xl bg-[var(--c-panel-2)] p-3"><div className="label-xs">mode</div><div className="mt-1 text-sm">local</div></div>
             <div className="rounded-xl bg-[var(--c-panel-2)] p-3"><div className="label-xs">circuit</div><div className="mt-1 text-sm">{circuit ? `${circuit.num_qubits} qubits` : "none yet"}</div></div>
             <div className="rounded-xl bg-[var(--c-panel-2)] p-3"><div className="label-xs">last run</div><div className="mt-1 text-sm">{result ? "available" : "not yet"}</div></div>
           </div>

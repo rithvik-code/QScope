@@ -556,7 +556,7 @@ def editable_arrow(cell):
     run.font.name = "Aptos"
     run.font.size = Pt(13)
     run.font.bold = True
-    run.font.color.rgb = RGBColor.from_string(TEAL)
+    run.font.color.rgb = RGBColor.from_string(TEAL.lstrip("#"))
 
 
 def insert_editable_steps(doc, anchor, figure_number, caption, steps, *, note=None):
@@ -654,7 +654,7 @@ def insert_editable_comparison(doc, anchor, figure_number, caption):
                 for run in p.runs:
                     run.font.name = "Aptos"
                     run.font.size = Pt(8)
-                    run.font.color.rgb = RGBColor.from_string(INK)
+                    run.font.color.rgb = RGBColor.from_string(INK.lstrip("#"))
     for row in table.rows:
         row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
     table._tbl.getparent().remove(table._tbl)

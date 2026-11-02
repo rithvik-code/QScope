@@ -499,7 +499,7 @@ export function Shell({
             QScope {health?.version ?? "0.1.0"} · python {health?.python ?? "—"} · numpy {health?.numpy ?? "—"} ·
             history {health?.experiments_stored ?? 0} runs
           </span>
-          <span className="mono-num hidden sm:block">{health?.database ?? ""}</span>
+          <span className="mono-num hidden sm:block" title={health?.database ?? ""}>{health?.database ? health.database.split(/[\\/]/).pop() : ""}</span>
         </div>
       </footer>
     </div>
