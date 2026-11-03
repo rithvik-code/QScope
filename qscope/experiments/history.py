@@ -19,6 +19,7 @@ import io
 import json
 import os
 import sqlite3
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -27,7 +28,13 @@ from typing import Any, Iterable, Sequence
 
 SCHEMA_VERSION = 3
 
-DEFAULT_DB = Path(os.environ.get("QSCOPE_DB", Path.home() / ".qscope" / "qscope.sqlite3"))
+_VERCEL_TMP = Path(os.environ.get("TMPDIR") or tempfile.gettempdir()) / "qscope"
+DEFAULT_DB = Path(
+    os.environ.get(
+        "QSCOPE_DB",
+        _VERCEL_TMP / "qscope.sqlite3" if os.environ.get("VERCEL") else Path.home() / ".qscope" / "qscope.sqlite3",
+    )
+)
 
 
 @dataclass

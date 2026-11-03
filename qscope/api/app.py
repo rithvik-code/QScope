@@ -24,6 +24,7 @@ import json
 import os
 import platform
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -120,7 +121,13 @@ from qscope.simulator import (
 )
 from qscope.simulator.noise import NoiseChannel, NoiseModel
 
-REPORTS_DIR = Path(os.environ.get("QSCOPE_REPORTS", Path.home() / ".qscope" / "reports"))
+_VERCEL_TMP = Path(os.environ.get("TMPDIR") or tempfile.gettempdir()) / "qscope"
+REPORTS_DIR = Path(
+    os.environ.get(
+        "QSCOPE_REPORTS",
+        _VERCEL_TMP / "reports" if os.environ.get("VERCEL") else Path.home() / ".qscope" / "reports",
+    )
+)
 FRONTEND_DIST = Path(os.environ.get("QSCOPE_FRONTEND", Path(__file__).resolve().parents[2] / "frontend" / "dist"))
 
 

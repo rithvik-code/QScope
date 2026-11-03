@@ -19,7 +19,7 @@ from docx.text.paragraph import Paragraph
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "QScope_Research_Paper_Rithvik.docx"
-OUTPUT = ROOT / "QScope_Research_Paper_Rithvik_Illustrated_v7.docx"
+OUTPUT = ROOT / "QScope_Research_Paper_Rithvik_Illustrated_v8.docx"
 FIGURE_DIR = ROOT / "docs" / "research_figures"
 W, H = 1800, 1120
 
@@ -545,6 +545,44 @@ def editable_cell(cell, heading, body, accent, fill):
     run.font.color.rgb = RGBColor.from_string(INK.lstrip("#"))
 
 
+def insert_editable_formula(doc, anchor, title, formula, explanation):
+    target = next((p for p in doc.paragraphs if anchor in p.text), None)
+    if target is None:
+        raise ValueError(f"Could not find formula insertion point: {anchor}")
+    table = doc.add_table(rows=1, cols=1)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    cell = table.cell(0, 0)
+    cell.width = Inches(6.85)
+    cell.text = ""
+    set_cell_margins(cell, top=100, start=150, bottom=100, end=150)
+    shade = OxmlElement("w:shd")
+    shade.set(qn("w:fill"), "EFF5FF")
+    cell._tc.get_or_add_tcPr().append(shade)
+    p = cell.paragraphs[0]
+    p.paragraph_format.space_after = Pt(3)
+    r = p.add_run(title)
+    r.bold = True
+    r.font.name = "Aptos"
+    r.font.size = Pt(9)
+    r.font.color.rgb = RGBColor.from_string("4E8EF7")
+    p = cell.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_after = Pt(3)
+    r = p.add_run(formula)
+    r.font.name = "Cambria Math"
+    r.font.size = Pt(12)
+    r.font.color.rgb = RGBColor.from_string("16243A")
+    p = cell.add_paragraph()
+    p.paragraph_format.space_after = Pt(0)
+    r = p.add_run(explanation)
+    r.font.name = "Aptos"
+    r.font.size = Pt(8.5)
+    r.font.color.rgb = RGBColor.from_string("16243A")
+    table._tbl.getparent().remove(table._tbl)
+    target._p.addnext(table._tbl)
+
+
 def editable_arrow(cell):
     cell.text = "↓"
     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
@@ -672,6 +710,54 @@ def insert_editable_comparison(doc, anchor, figure_number, caption):
     run.font.color.rgb = RGBColor(74, 91, 109)
 
 
+def insert_editable_algorithm(doc, anchor, title, precondition, steps, postcondition):
+    target = next((p for p in doc.paragraphs if anchor in p.text), None)
+    if target is None:
+        raise ValueError(f"Could not find algorithm insertion point: {anchor}")
+    table = doc.add_table(rows=1 + len(steps) + 1, cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    widths = [0.72, 6.13]
+    for row in table.rows:
+        row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        row.cells[0].width = Inches(widths[0])
+        row.cells[1].width = Inches(widths[1])
+    merged = table.cell(0, 0).merge(table.cell(0, 1))
+    merged.text = title
+    for run in merged.paragraphs[0].runs:
+        run.bold = True
+        run.font.name = "Aptos"
+        run.font.size = Pt(9.5)
+        run.font.color.rgb = RGBColor.from_string("FFFFFF")
+    shade = OxmlElement("w:shd")
+    shade.set(qn("w:fill"), NAVY)
+    merged._tc.get_or_add_tcPr().append(shade)
+    set_cell_margins(merged, top=90, start=130, bottom=90, end=130)
+    labels = [("Input", precondition)] + [(f"{i:02d}", step) for i, step in enumerate(steps, 1)] + [("Output", postcondition)]
+    for idx, (label, body) in enumerate(labels, start=1):
+        row = table.rows[idx]
+        left, right = row.cells
+        left.text = label
+        right.text = body
+        for cell in (left, right):
+            set_cell_margins(cell, top=65, start=95, bottom=65, end=95)
+            sh = OxmlElement("w:shd")
+            sh.set(qn("w:fill"), "EFF5FF" if idx % 2 else "F8FAFC")
+            cell._tc.get_or_add_tcPr().append(sh)
+            for para in cell.paragraphs:
+                para.paragraph_format.space_after = Pt(0)
+                para.paragraph_format.keep_together = True
+                for run in para.runs:
+                    run.font.name = "Aptos"
+                    run.font.size = Pt(8.5)
+                    run.font.color.rgb = RGBColor.from_string("16243A")
+        for run in left.paragraphs[0].runs:
+            run.bold = True
+            run.font.color.rgb = RGBColor.from_string("4E8EF7")
+    table._tbl.getparent().remove(table._tbl)
+    target._p.addnext(table._tbl)
+
+
 def clean_manuscript(doc):
     heading_map = {
         "INTRODUCTION": "I. INTRODUCTION",
@@ -750,8 +836,42 @@ def main():
         ("HISTORY RECORD", "Keep the circuit snapshot, run settings, measured result, timestamp, and provenance together.", "12B89C", "ECFBF7"),
         ("REPRODUCE · COMPARE · EXTEND · EXPORT", "Return to a saved run and use it as the starting point for the next experiment.", "E4A13A", "FFF7E9"),
     ], note=("RESEARCH ASSISTANT", "Ask about a circuit, trace, run, or saved record. The assistant should ground explanations in available project evidence and say when information is missing.", "8069E8", "F4F1FF"))
+
+    # Mathematical definitions are inserted next to the implementation discussion
+    # they clarify; all expressions remain ordinary editable Word text.
+    insert_editable_formula(doc, "For a pure n-qubit state", "State-vector storage", "|ψ⟩ = Σ(i=0…2ⁿ−1) αᵢ|i⟩     ·     Σᵢ |αᵢ|² = 1     ·     Mₛᵥ = 16 × 2ⁿ bytes", "αᵢ are complex amplitudes. The 16-byte factor is complex128 storage; this is the raw array, before temporary working copies.")
+    insert_editable_formula(doc, "A dense density matrix stores", "Density-matrix storage", "ρ = |ψ⟩⟨ψ|     ·     Tr(ρ) = 1     ·     Mₘₐₜᵣᵢₓ = 16 × 4ⁿ bytes", "A density matrix has 2ⁿ × 2ⁿ complex entries. QScope’s peak estimate uses a working-copy multiplier, so its estimate is larger than this raw array.")
+    insert_editable_formula(doc, "Before a run, QScope estimates", "Peak-memory preflight", "Mₚₑₐₖ = 3 × Mᵣₑₚᵣₑₛₑₙₜₐₜᵢₒₙ     ·     allow run only when Mₚₑₐₖ ≤ B", "B is the configured memory budget. The multiplier models state plus temporary working copies; it is a guardrail estimate, not an operating-system memory guarantee.")
+    insert_editable_formula(doc, "For each measurement outcome", "Measurement statistics", "p(x) = |⟨x|ψ⟩|²     ·     f̂(x) = Nₓ / S     ·     SE[f̂] ≈ √(p(x)(1−p(x))/S)", "p(x) is the ideal Born probability; Nₓ is the observed count among S shots. The standard-error expression is an approximation for independent samples.")
+    insert_editable_formula(doc, "The trace service records", "Density-matrix purity", "Purity(ρ) = Tr(ρ²)     ·     von Neumann entropy S(ρ) = −Tr(ρ log₂ρ)", "For a valid pure state, purity is 1; mixed states have lower purity. Entropy uses the eigenvalue distribution of ρ and is expressed in bits.")
+    insert_editable_formula(doc, "QScope includes a parameterized QAOA", "QAOA Max-Cut objective", "C(z) = Σ((u,v)∈E) wᵤᵥ · [zᵤ ≠ zᵥ]     ·     ⟨C⟩ = ⟨ψ(γ,β)| Ĉ |ψ(γ,β)⟩", "The cost counts the weights of graph edges cut by bitstring z. QAOA alternates cost and mixer operations; parameters are searched experimentally rather than guaranteed to find the optimum.")
+
+    insert_editable_algorithm(doc, "QScope is organized into four cooperating layers", "Algorithm 1. Resource-aware single-run execution", "Input: validated circuit C, run options O, and memory budget B.", [
+        "Compute qubit count n and determine whether the requested noise model is ideal.",
+        "Choose the requested backend, or select state vector for ideal evolution; for noisy runs choose exact density matrix when its configured limit permits, otherwise sampled trajectories.",
+        "Estimate raw and peak memory for the selected representation, then compare peak memory with B and the backend’s practical qubit limit.",
+        "If the request is incompatible or over budget, return a blocked plan with the estimate and safe-qubit guidance; do not start simulation.",
+        "Run the circuit with the chosen engine, shots, and seed; collect counts, probabilities, metrics, timing, and memory observations.",
+        "Return the result with simulation mode, backend, settings, warnings, and provenance attached.",
+    ], "Output: a labelled simulation result with its execution plan, or an actionable refusal.")
+    insert_editable_algorithm(doc, "Batch parallelism is across independent circuits", "Algorithm 2. Memory-bounded batch scheduling", "Input: ordered jobs J, estimated peak memory mⱼ, shared budget B, and worker cap W.", [
+        "Keep the next unassigned job in input order and begin a new execution wave.",
+        "Add consecutive jobs to the wave while the worker count stays ≤ W and the sum of estimated peaks stays ≤ B.",
+        "If one job alone exceeds B, submit it to the normal planner so it returns the standard safe refusal rather than disappearing.",
+        "Run a one-job wave directly; otherwise run the wave concurrently.",
+        "Place each completed result into its original input position, regardless of completion order.",
+        "Repeat until every job has a result or planner refusal; return results in original order.",
+    ], "Output: ordered per-job results, with each wave’s estimated concurrent peak kept within the shared budget where feasible.")
+    insert_editable_algorithm(doc, "For batch experiments, a memory-bounded scheduler", "Algorithm 3. Reproducible parameter sweep", "Input: experiment specification with parameter axes, circuit builder, shots, backend, noise model, and seed.", [
+        "Generate the Cartesian product of axis values, stopping at the configured combination limit.",
+        "For each parameter point, build the circuit and derive a reproducible point-specific seed from the experiment seed and point index.",
+        "Plan the run and execute it using the same simulation pipeline as an individual circuit.",
+        "Measure circuit resources, runtime, observed memory, counts, probabilities, and requested algorithm metrics.",
+        "When an analytic reference exists, compute its success or expectation value and record deviation separately from measured data.",
+        "Store the parameter point, result, settings, and provenance as one experiment row; aggregate rows for plots and reports.",
+    ], "Output: chart-ready rows that distinguish analytic references, simulated measurements, estimates, and observations.")
     doc.core_properties.title = "QScope: A Local-First, Resource-Aware Quantum Circuit Simulation and Research Workspace"
-    doc.core_properties.subject = "Research manuscript with editable Word workflow, architecture, simulation, execution, and reproducibility diagrams"
+    doc.core_properties.subject = "Research manuscript with editable diagrams, mathematical formulas, and algorithm tables"
     doc.save(OUTPUT)
     print(f"Wrote {OUTPUT}")
     print("Added five editable Word diagrams; no diagram images are embedded.")
